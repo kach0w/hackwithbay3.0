@@ -1,4 +1,5 @@
 import neo4j from 'neo4j-driver'
+import { flattenGraph } from './graph-shape.js'
 
 const driver = neo4j.driver(
   process.env.NEO4J_URI,
@@ -15,56 +16,23 @@ async function run(cypher, params = {}) {
   }
 }
 
-// Contract 1 shape: { nodes, edges }
+// Verify the connection at startup so a bad Aura URI/password fails loud, not
+// silently at the first /graph request during the demo.
+export async function verifyConnection() {
+  await driver.verifyConnectivity()
+}
+
+// Contract 1: { nodes, edges }
 export async function fetchGraph() {
   const records = await run(`
     MATCH (n)
     OPTIONAL MATCH (n)-[r]->(m)
     RETURN n, r, m
   `)
-
-  const nodesMap = {}
-  const edgesMap = {}
-
-  for (const rec of records) {
-    const n = rec.get('n')
-    if (n && !nodesMap[n.elementId]) {
-      nodesMap[n.elementId] = {
-        id: n.properties.id || n.elementId,
-        type: n.labels[0],
-        label: n.properties.name || n.properties.text || '',
-        owner: n.properties.owner || null,
-        deprecated: n.properties.deprecated || false,
-        ts: n.properties.ts ? n.properties.ts.toString() : null
-      }
-    }
-    const m = rec.get('m')
-    const r = rec.get('r')
-    if (m && !nodesMap[m.elementId]) {
-      nodesMap[m.elementId] = {
-        id: m.properties.id || m.elementId,
-        type: m.labels[0],
-        label: m.properties.name || m.properties.text || '',
-        owner: m.properties.owner || null,
-        deprecated: m.properties.deprecated || false,
-        ts: m.properties.ts ? m.properties.ts.toString() : null
-      }
-    }
-    if (r && !edgesMap[r.elementId]) {
-      edgesMap[r.elementId] = {
-        id: r.elementId,
-        source: nodesMap[n.elementId]?.id,
-        target: nodesMap[m.elementId]?.id,
-        type: r.type,
-        deprecated: r.properties.deprecated || false
-      }
-    }
-  }
-
-  return { nodes: Object.values(nodesMap), edges: Object.values(edgesMap) }
+  return flattenGraph(records)
 }
 
-// Add a new decision about a component
+// Add a new decision about a component (no conflict / nothing to retire).
 export async function addDecision({ id, text, component, author }) {
   await run(`
     MATCH (c:Component {name: $component})
@@ -76,11 +44,17 @@ export async function addDecision({ id, text, component, author }) {
   `, { id, text, component, author })
 }
 
-// Supersede old decision — retire it, link new one
+// Supersede: retire the single newest live decision about the component and
+// link the new one with SUPERSEDES. Bounding to the newest (ORDER BY ts DESC
+// LIMIT 1) means that even if the graph somehow holds >1 live decision, we
+// retire one and create exactly one new node (no duplicate-id blowup).
 export async function supersedeDecision({ id, text, component, author }) {
   await run(`
     MATCH (old:Decision)-[:ABOUT]->(c:Component {name: $component})
     WHERE old.deprecated = false
+    WITH old, c
+    ORDER BY old.ts DESC
+    LIMIT 1
     SET old.deprecated = true
     WITH old, c
     MATCH (p:Person {name: $author})
@@ -92,7 +66,9 @@ export async function supersedeDecision({ id, text, component, author }) {
   `, { id, text, component, author })
 }
 
-// Inference: who owns components that depend on the changed component?
+// Inference: who owns a component that transitively (1..3 hops) depends on the
+// changed component. Returns [{ notify, affected }] where notify is a person
+// name and affected is the list of their impacted component names.
 export async function inferAffected(component) {
   const records = await run(`
     MATCH (c:Component {name: $component})<-[:DEPENDS_ON*1..3]-(dep:Component)<-[:OWNS]-(p:Person)
@@ -101,7 +77,7 @@ export async function inferAffected(component) {
 
   return records.map(r => ({
     notify: r.get('notify'),
-    affected: r.get('affected')
+    affected: r.get('affected'),
   }))
 }
 
