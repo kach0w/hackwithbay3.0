@@ -17,8 +17,8 @@ export async function computeOverlaps(sessionId) {
 
   // Claude reasons over ALL profiles together to find meaningful intersections
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 2048,
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 600,
     system: `You find meaningful overlaps between builders that could lead to great projects.
 Do NOT just match tags. Reason about complementary skills, shared curiosities, and what they could uniquely build together.
 An overlap should be specific enough to suggest a real project direction.`,

@@ -5,7 +5,7 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 async function fetchText(url) {
   const res = await fetch(url, {
     headers: { 'User-Agent': 'Mozilla/5.0 (compatible; research bot)' },
-    signal: AbortSignal.timeout(8000)
+    signal: AbortSignal.timeout(4000)
   })
   const html = await res.text()
   return html
@@ -31,7 +31,7 @@ function extractLinks(html, baseUrl) {
       }
     } catch {}
   }
-  return links.slice(0, 6) // crawl up to 6 sub-pages
+  return links.slice(0, 2) // crawl up to 2 sub-pages for speed
 }
 
 export async function extractFromWebsite(url) {
@@ -43,7 +43,7 @@ export async function extractFromWebsite(url) {
     // Fetch main page HTML (for link extraction) and text
     const res = await fetch(normalized, {
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; research bot)' },
-      signal: AbortSignal.timeout(8000)
+      signal: AbortSignal.timeout(4000)
     })
     const mainHtml = await res.text()
     const mainText = mainHtml
@@ -66,7 +66,7 @@ export async function extractFromWebsite(url) {
 
     const response = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 400,
+      max_tokens: 300,
       messages: [{
         role: 'user',
         content: `Analyze this person's entire personal website to understand who they are.
