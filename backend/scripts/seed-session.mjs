@@ -1,10 +1,15 @@
 import 'dotenv/config'
-import driver, { seedProjectSession, seedBrainstormSession } from '../lib/neo4j.js'
+import driver, { seedProjectSession, seedBrainstormSession, seedDemoSession } from '../lib/neo4j.js'
 
 const sessionId = process.argv[2] || 'demo'
 const what = process.argv[3] || 'project'
 
 try {
+  // 'demo' = the rich "complex mind" PROJECT graph, into this ONE session only.
+  if (what === 'demo') {
+    await seedDemoSession(sessionId)
+    console.log(`✓ seeded rich DEMO project graph into session "${sessionId}"`)
+  }
   if (what === 'project' || what === 'both') {
     await seedProjectSession(sessionId)
     console.log(`✓ seeded PROJECT graph into session "${sessionId}"`)

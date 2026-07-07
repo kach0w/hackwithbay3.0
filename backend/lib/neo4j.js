@@ -279,6 +279,81 @@ export async function seedProjectSession(sessionId) {
   `, { sessionId })
 }
 
+// Rich "complex mind" for the demo — OPT-IN, loads into ONE session only.
+// NOT auto-run on session creation. Demo people carry a synthetic
+// butterbase_user_id so membersOnly() keeps them (real sessions still hide
+// unauthenticated seed people). Load with:  npm run seed -- <sessionId> demo
+export async function seedDemoSession(sessionId) {
+  await seedProjectSession(sessionId) // components, dependency web, d_pg
+
+  // demo people that survive the members-only filter
+  await run(`
+    MATCH (s:Session {id: $sessionId})
+    UNWIND [['person_shreeya','Shreeya'],['person_frank','Frank'],
+            ['person_ryan','Ryan'],['person_priya','Priya']] AS pr
+    MERGE (p:Person {id: pr[0]})
+      SET p.name = pr[1], p.label = pr[1], p.butterbase_user_id = 'seed_' + pr[0]
+    MERGE (p)-[:IN_SESSION]->(s)
+  `, { sessionId })
+
+  // ownership — every component owned, so inference fans out
+  await run(`
+    UNWIND [['person_shreeya','comp_user-service'],['person_frank','comp_auth-service'],
+            ['person_ryan','comp_matching-engine'],['person_priya','comp_payments'],
+            ['person_frank','comp_frontend'],['person_priya','comp_notifications']] AS o
+    MATCH (p:Person {id: o[0]}), (c:Component {id: o[1]})
+    MERGE (p)-[:OWNS]->(c)
+  `, { sessionId })
+
+  // author the base d_pg decision
+  await run(`
+    MATCH (d:Decision {id: 'd_pg'}), (p:Person {id: 'person_shreeya'})
+    MERGE (p)-[:MADE]->(d)
+  `, { sessionId })
+
+  // extra multi-hop dependencies (notifications -> matching-engine -> user-service)
+  await run(`
+    UNWIND [['comp_frontend','comp_matching-engine'],['comp_payments','comp_auth-service'],
+            ['comp_notifications','comp_matching-engine']] AS d
+    MATCH (a:Component {id: d[0]}), (b:Component {id: d[1]})
+    MERGE (a)-[:DEPENDS_ON]->(b)
+  `, { sessionId })
+
+  // a live decision on every other component
+  await run(`
+    MATCH (s:Session {id: $sessionId})
+    UNWIND [
+      ['d_react','Use React for frontend','comp_frontend','person_frank','PT3H'],
+      ['d_jwt','JWT for auth tokens','comp_auth-service','person_frank','PT4H'],
+      ['d_stripe','Use Stripe for payments','comp_payments','person_priya','PT1H'],
+      ['d_graphql','GraphQL API for matching-engine','comp_matching-engine','person_ryan','PT30M']
+    ] AS row
+    MATCH (c:Component {id: row[2]}), (p:Person {id: row[3]})
+    MERGE (dec:Decision {id: row[0]})
+      ON CREATE SET dec.text = row[1], dec.label = row[1],
+                    dec.ts = datetime() - duration(row[4]), dec.deprecated = false
+    MERGE (dec)-[:IN_SESSION]->(s)
+    MERGE (dec)-[:ABOUT]->(c)
+    MERGE (p)-[:MADE]->(dec)
+  `, { sessionId })
+
+  // pre-superseded chain visible on entry: deprecated d_rest <-[:SUPERSEDES]- d_graphql
+  await run(`
+    MATCH (s:Session {id: $sessionId})
+    MATCH (c:Component {id: 'comp_matching-engine'}), (p:Person {id: 'person_ryan'})
+    MERGE (old:Decision {id: 'd_rest'})
+      ON CREATE SET old.text = 'REST API for matching-engine',
+                    old.label = 'REST API for matching-engine',
+                    old.ts = datetime() - duration('PT5H'), old.deprecated = true
+    MERGE (old)-[:IN_SESSION]->(s)
+    MERGE (old)-[:ABOUT]->(c)
+    MERGE (p)-[:MADE]->(old)
+    WITH s, old
+    MATCH (new:Decision {id: 'd_graphql'})-[:IN_SESSION]->(s)
+    MERGE (new)-[:SUPERSEDES]->(old)
+  `, { sessionId })
+}
+
 export async function seedBrainstormSession(sessionId) {
   await createSession(sessionId)
 
