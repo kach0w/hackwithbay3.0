@@ -155,7 +155,27 @@ export async function addDomainEdge(sessionId, personId, domainName) {
   `, { sessionId, personId, domainId: `domain_${domainName.toLowerCase().replace(/\s+/g,'_')}`, domainName })
 }
 
+// The 6 components the project graph is seeded with. Decisions must map to one
+// of these or the MATCH silently no-ops. Normalizing on the write side locks the
+// seam regardless of what the extractor returns.
+export const CANONICAL_COMPONENTS = ['frontend', 'auth-service', 'user-service', 'matching-engine', 'payments', 'notifications']
+
+// "the user service" / "user_service" / "USER-SERVICE" -> "user-service".
+// A component the model invents that isn't canonical still passes through (slugified).
+export function normalizeComponent(raw) {
+  if (!raw) return raw
+  const slug = String(raw).toLowerCase().trim().replace(/[\s_]+/g, '-')
+  if (CANONICAL_COMPONENTS.includes(slug)) return slug
+  const compact = slug.replace(/-/g, '')
+  // match "user-service", "user service", "the user service", "userservice"
+  return CANONICAL_COMPONENTS.find(c => {
+    const cc = c.replace(/-/g, '')
+    return compact === cc || compact.includes(cc)
+  }) || slug
+}
+
 export async function addDecision(sessionId, { id, text, component, author }) {
+  component = normalizeComponent(component)
   await run(`
     MATCH (s:Session {id: $sessionId})
     MERGE (c:Component {id: $compId})-[:IN_SESSION]->(s)
@@ -174,6 +194,7 @@ export async function addDecision(sessionId, { id, text, component, author }) {
 // `old` to the session prevents (a) deprecating every live decision + creating a
 // duplicate new node per match, and (b) touching another session's decisions.
 export async function supersedeDecision(sessionId, { id, text, component, author }) {
+  component = normalizeComponent(component)
   await run(`
     MATCH (s:Session {id: $sessionId})
     MATCH (old:Decision)-[:ABOUT]->(c:Component {id: $compId})
@@ -196,6 +217,7 @@ export async function supersedeDecision(sessionId, { id, text, component, author
 // Returns BOTH ids (for frontend highlight — nodes are keyed person_/comp_) and
 // names (for display text). Empty array if nothing depends on it / not seeded.
 export async function inferAffected(sessionId, component) {
+  component = normalizeComponent(component)
   const records = await run(`
     MATCH (s:Session {id: $sessionId})
     MATCH (c:Component {id: $compId})<-[:DEPENDS_ON*1..3]-(dep:Component)<-[:OWNS]-(p:Person)
@@ -273,26 +295,61 @@ export async function seedProjectSession(sessionId) {
 export async function seedBrainstormSession(sessionId) {
   await createSession(sessionId)
 
-  // Example scaffold — replace with the real team. Two people, a shared skill,
-  // and one Overlap node so the "meaningful intersection" visual has something.
-  await addPerson(sessionId, {
-    id: 'person_shreeya', name: 'Shreeya',
-    archetype: 'Infra-minded builder', skills: ['Neo4j', 'Node', 'Cypher'],
-    domains: ['Developer tools', 'Graphs']
-  })
-  await addPerson(sessionId, {
-    id: 'person_frank', name: 'Frank',
-    archetype: 'Full-stack generalist', skills: ['React', 'Node', 'Auth'],
-    domains: ['Developer tools', 'Realtime']
-  })
-  for (const [pid, skills] of [['person_shreeya', ['Neo4j','Node','Cypher']], ['person_frank', ['React','Node','Auth']]]) {
-    for (const sk of skills) await addSkillEdge(sessionId, pid, sk)
+  // Edit these names/skills to the real team. Idempotent (addPerson/addSkillEdge
+  // /addDomainEdge all MERGE). Overlaps mirror agents/ingestion/overlap.js exactly
+  // so the seeded and live-computed brainstorm graphs render identically.
+  const team = [
+    { id: 'person_shreeya', name: 'Shreeya', archetype: 'Infra-minded graph builder',
+      synthesis: 'Backend/infra engineer who thinks in graphs and data models.',
+      strongest_in: ['Neo4j', 'Cypher', 'Backend'], curious_about: ['Realtime systems', 'Agents'],
+      skills: ['Neo4j', 'Node', 'Cypher', 'Backend'], domains: ['Developer tools', 'Graphs'] },
+    { id: 'person_frank', name: 'Frank', archetype: 'Full-stack generalist',
+      synthesis: 'Ships end-to-end features fast; comfortable across the whole stack.',
+      strongest_in: ['React', 'Node', 'Auth'], curious_about: ['Graph UX', 'Realtime'],
+      skills: ['React', 'Node', 'Auth', 'APIs'], domains: ['Developer tools', 'Realtime'] },
+    { id: 'person_ryan', name: 'Ryan', archetype: 'ML / matching systems',
+      synthesis: 'Builds ranking and matching engines; likes messy real-world data.',
+      strongest_in: ['Python', 'ML', 'Ranking'], curious_about: ['Graph algorithms', 'Recommendations'],
+      skills: ['Python', 'ML', 'Ranking', 'Data'], domains: ['Matching', 'Data'] },
+    { id: 'person_priya', name: 'Priya', archetype: 'Payments & product',
+      synthesis: 'Owns payments/marketplace flows; bridges product and engineering.',
+      strongest_in: ['Payments', 'Product', 'TypeScript'], curious_about: ['Marketplaces', 'Trust & safety'],
+      skills: ['Payments', 'TypeScript', 'Product'], domains: ['Fintech', 'Marketplaces'] },
+  ]
+
+  for (const p of team) {
+    await addPerson(sessionId, p)
+    for (const sk of p.skills) await addSkillEdge(sessionId, p.id, sk)
+    for (const dm of p.domains) await addDomainEdge(sessionId, p.id, dm)
   }
-  for (const [pid, domains] of [['person_shreeya', ['Developer tools','Graphs']], ['person_frank', ['Developer tools','Realtime']]]) {
-    for (const dm of domains) await addDomainEdge(sessionId, pid, dm)
+
+  const overlaps = [
+    { id: 'ov_graph_realtime', people: ['Shreeya', 'Frank'], label: 'Graph + Realtime', strength: 5,
+      intersection: 'Both live in developer tools — one models the graph, the other makes it feel live.',
+      build_direction: 'A collaborative graph that updates on every teammate action in realtime.' },
+    { id: 'ov_matching_payments', people: ['Ryan', 'Priya'], label: 'Matching → Marketplace', strength: 4,
+      intersection: 'Ranking expertise meets payments and marketplace ownership.',
+      build_direction: 'A two-sided marketplace where good matches convert straight into paid transactions.' },
+    { id: 'ov_full_group', people: ['Shreeya', 'Frank', 'Ryan', 'Priya'], label: 'Full-stack graph product', strength: 5,
+      intersection: 'Graph infra + full-stack + ML matching + payments covers a whole product with no gaps.',
+      build_direction: 'Ship a graph-native product with realtime UX, smart matching, and payments end to end.' },
+  ]
+
+  for (const o of overlaps) {
+    await run(`
+      MATCH (s:Session {id: $sessionId})
+      MERGE (o:Overlap {id: $id})-[:IN_SESSION]->(s)
+      SET o.label = $label, o.intersection = $intersection,
+          o.build_direction = $build_direction, o.strength = $strength
+    `, { sessionId, id: o.id, label: o.label, intersection: o.intersection, build_direction: o.build_direction, strength: o.strength })
+    for (const name of o.people) {
+      await run(`
+        MATCH (p:Person {id: $personId})-[:IN_SESSION]->(s:Session {id: $sessionId})
+        MATCH (o:Overlap {id: $overlapId})-[:IN_SESSION]->(s)
+        MERGE (p)-[:OVERLAPS_WITH]->(o)
+      `, { sessionId, personId: `person_${name.toLowerCase().replace(/\s+/g, '_')}`, overlapId: o.id })
+    }
   }
-  // TODO(Person A): compute/seed Overlap nodes across all members
-  // (shared skill "Node", shared domain "Developer tools" → build direction).
 }
 
 export default driver

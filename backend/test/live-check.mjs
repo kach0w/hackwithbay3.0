@@ -3,7 +3,8 @@
 // non-destructive supersede check. Run:  node test/live-check.mjs
 import 'dotenv/config'
 import driver, {
-  verifyConnection, seedProjectSession, fetchProjectGraph, inferAffected,
+  verifyConnection, seedProjectSession, seedBrainstormSession,
+  fetchProjectGraph, fetchBrainstormGraph, inferAffected, normalizeComponent,
 } from '../lib/neo4j.js'
 
 const S = 'livecheck'
@@ -15,6 +16,13 @@ try {
   await seedProjectSession(S)
   const { nodes, edges } = await fetchProjectGraph(S)
   console.log(`✓ project graph: ${nodes.length} nodes, ${edges.length} edges`)
+
+  await seedBrainstormSession(S)
+  const brain = await fetchBrainstormGraph(S)
+  const overlaps = brain.nodes.filter(n => n.type === 'Overlap').length
+  console.log(`✓ brainstorm graph: ${brain.nodes.length} nodes, ${brain.edges.length} edges, ${overlaps} overlaps`)
+
+  console.log(`✓ normalizeComponent("the user service") -> ${normalizeComponent('the user service')}`)
 
   const affected = await inferAffected(S, 'user-service')
   console.log('✓ inferAffected("user-service") →')
