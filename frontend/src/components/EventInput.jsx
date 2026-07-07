@@ -3,6 +3,15 @@ import { postEvent } from '../lib/api'
 
 const AUTHORS = ['Shreeya', 'Frank', 'Ryan', 'Priya']
 
+const bp = {
+  bg: '#0d4f8c',
+  border: 'rgba(255,255,255,0.3)',
+  input: 'rgba(255,255,255,0.08)',
+  text: '#ffffff',
+  muted: 'rgba(255,255,255,0.45)',
+  font: "'Courier New', monospace",
+}
+
 export default function EventInput({ onResult }) {
   const [text, setText] = useState('')
   const [author, setAuthor] = useState('Shreeya')
@@ -24,44 +33,60 @@ export default function EventInput({ onResult }) {
   }
 
   return (
-    <div style={{ padding: 16, borderTop: '1px solid #1e293b', background: '#0f172a' }}>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+    <div style={{ background: bp.bg, borderTop: `2px solid ${bp.border}`, padding: '12px 20px' }}>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+        <span style={{ fontSize: 10, color: bp.muted, fontFamily: bp.font, letterSpacing: 2, whiteSpace: 'nowrap' }}>
+          AUTHOR
+        </span>
         <select
           value={author}
           onChange={e => setAuthor(e.target.value)}
-          style={{ background: '#1e293b', color: '#f9fafb', border: '1px solid #334155', padding: '8px', borderRadius: 4 }}
+          style={{
+            background: bp.input, color: bp.text,
+            border: `1px solid ${bp.border}`,
+            fontFamily: bp.font, fontSize: 12, letterSpacing: 1,
+            padding: '6px 8px', outline: 'none'
+          }}
         >
-          {AUTHORS.map(a => <option key={a}>{a}</option>)}
+          {AUTHORS.map(a => <option key={a} style={{ background: '#0d4f8c' }}>{a}</option>)}
         </select>
+
+        <span style={{ fontSize: 10, color: bp.muted, fontFamily: bp.font, letterSpacing: 2, whiteSpace: 'nowrap' }}>
+          DECISION
+        </span>
         <input
           value={text}
           onChange={e => setText(e.target.value)}
           placeholder='e.g. "switching user-service from Postgres to Neo4j"'
           disabled={loading}
           style={{
-            flex: 1, background: '#1e293b', color: '#f9fafb',
-            border: '1px solid #334155', padding: '8px 12px',
-            borderRadius: 4, fontFamily: 'monospace', fontSize: 14
+            flex: 1, background: bp.input, color: bp.text,
+            border: `1px solid ${bp.border}`,
+            fontFamily: bp.font, fontSize: 13, letterSpacing: 0.5,
+            padding: '6px 12px', outline: 'none',
           }}
         />
         <button
           type="submit"
           disabled={loading || !text.trim()}
           style={{
-            background: '#3b82f6', color: '#fff', border: 'none',
-            padding: '8px 20px', borderRadius: 4, cursor: 'pointer', fontWeight: 600
+            background: 'transparent', color: bp.text,
+            border: `1px solid ${bp.border}`,
+            fontFamily: bp.font, fontSize: 11, letterSpacing: 3,
+            padding: '6px 20px', cursor: loading ? 'wait' : 'pointer',
+            opacity: (!text.trim() || loading) ? 0.4 : 1
           }}
         >
-          {loading ? '...' : 'Send'}
+          {loading ? 'PROCESSING...' : 'COMMIT'}
         </button>
       </form>
 
       {last && (
-        <div style={{ marginTop: 8, fontSize: 12, color: '#94a3b8' }}>
-          intent: <span style={{ color: '#60a5fa' }}>{last.intent}</span>
+        <div style={{ marginTop: 8, fontSize: 10, fontFamily: bp.font, letterSpacing: 1, color: bp.muted }}>
+          INTENT: <span style={{ color: '#ffe066' }}>{last.intent?.toUpperCase()}</span>
           {last.affected?.length > 0 && (
-            <span style={{ marginLeft: 16, color: '#f87171' }}>
-              notify: {last.affected.map(a => a.notify).join(', ')}
+            <span style={{ marginLeft: 20, color: '#ff9999' }}>
+              NOTIFY → {last.affected.map(a => a.notify.toUpperCase()).join(', ')}
             </span>
           )}
         </div>

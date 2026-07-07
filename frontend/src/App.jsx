@@ -4,11 +4,15 @@ import EventInput from './components/EventInput'
 import { fetchGraph } from './lib/api'
 import { useRealtime } from './hooks/useRealtime'
 
-const LEGEND = [
-  { type: 'Person',    color: '#60a5fa' },
-  { type: 'Component', color: '#34d399' },
-  { type: 'Decision',  color: '#fbbf24' }
-]
+const BP_HEADER = {
+  background: '#0d4f8c',
+  borderBottom: '2px solid rgba(255,255,255,0.3)',
+  padding: '10px 20px',
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  fontFamily: "'Courier New', monospace",
+}
 
 export default function App() {
   const [graph, setGraph] = useState({ nodes: [], edges: [] })
@@ -32,26 +36,24 @@ export default function App() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#0f172a', color: '#f9fafb', fontFamily: 'sans-serif' }}>
-      <header style={{ padding: '12px 20px', borderBottom: '1px solid #1e293b', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: 1 }}>
-          ◈ Hivemind
-          <span style={{ fontSize: 12, color: '#64748b', marginLeft: 12, fontWeight: 400 }}>
-            shared project memory
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#1464b4', color: '#fff' }}>
+      <header style={BP_HEADER}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}>
+          <span style={{ fontSize: 18, fontWeight: 700, letterSpacing: 4, color: '#fff' }}>
+            HIVEMIND
+          </span>
+          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', letterSpacing: 3 }}>
+            PROJECT MEMORY SYSTEM
           </span>
         </div>
-        <div style={{ display: 'flex', gap: 16, fontSize: 12, color: '#64748b' }}>
-          {LEGEND.map(l => (
-            <span key={l.type} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span style={{ width: 10, height: 10, borderRadius: '50%', background: l.color, display: 'inline-block' }} />
-              {l.type}
-            </span>
-          ))}
-          <span>{graph.nodes.length} nodes · {graph.edges.length} edges</span>
+        <div style={{ display: 'flex', gap: 24, fontSize: 11, color: 'rgba(255,255,255,0.6)', letterSpacing: 2 }}>
+          <span>NODES: {graph.nodes.length}</span>
+          <span>EDGES: {graph.edges.length}</span>
+          <span style={{ color: 'rgba(255,255,255,0.3)' }}>REV 1.0</span>
         </div>
       </header>
 
-      <div style={{ flex: 1, overflow: 'hidden' }}>
+      <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
         <GraphCanvas graph={graph} highlightIds={highlightIds} />
       </div>
 
