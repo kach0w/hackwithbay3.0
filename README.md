@@ -2,6 +2,8 @@
 
 > Most project memory is a pile of stale notes. Hivemind makes it a living graph that knows how decisions relate, corrects itself when they change, and tells you who's affected.
 
+**Hackathon brief:** [PROBLEM_STATEMENT.md](./PROBLEM_STATEMENT.md)
+
 ---
 
 ## What it does
