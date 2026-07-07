@@ -2,8 +2,9 @@ import { butterbase, butterbaseConfigured } from './butterbase'
 
 export async function getCurrentUser() {
   if (!butterbaseConfigured || !butterbase) return null
-  const { data } = await butterbase.auth.getUser()
-  return data?.user ?? null
+  const { data, error } = await butterbase.auth.getUser()
+  if (error || !data?.id) return null
+  return data
 }
 
 export async function signInOrUp({ email, password, mode }) {
@@ -11,15 +12,22 @@ export async function signInOrUp({ email, password, mode }) {
     throw new Error('Butterbase not configured')
   }
 
-  if (mode === 'signin' || mode === 'login') {
-    const { error } = await butterbase.auth.signIn({ email, password })
-    if (error) throw new Error(error.message)
-  } else {
+  const isSignIn = mode === 'signin' || mode === 'login'
+
+  if (!isSignIn) {
     const { error: signUpError } = await butterbase.auth.signUp({ email, password })
     if (signUpError) throw new Error(signUpError.message)
-    const { error: signInError } = await butterbase.auth.signIn({ email, password })
-    if (signInError) throw new Error(signInError.message)
   }
+
+  const { data, error: signInError } = await butterbase.auth.signIn({ email, password })
+  if (signInError) {
+    if (!isSignIn) {
+      throw new Error('Account created. Sign in with your password — check email if verification is required.')
+    }
+    throw new Error(signInError.message)
+  }
+
+  if (data?.user?.id) return data.user
 
   const user = await getCurrentUser()
   if (!user?.id) throw new Error('Could not load Butterbase user')
