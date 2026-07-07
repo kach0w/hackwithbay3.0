@@ -1,0 +1,16 @@
+{
+  "tables": {
+    "graph_events": {
+      "columns": {
+        "id": { "type": "uuid", "nullable": false, "default": "gen_random_uuid()" },
+        "author": { "type": "text", "nullable": false },
+        "intent": { "type": "text", "nullable": false },
+        "component": { "type": "text", "nullable": true },
+        "created_at": { "type": "timestamptz", "nullable": false, "default": "now()" }
+      },
+      "indexes": {
+        "graph_events_created_at_idx": { "columns": ["created_at"] }
+      }
+    }
+  }
+}

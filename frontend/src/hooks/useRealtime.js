@@ -1,17 +1,22 @@
-import { useEffect } from 'react'
-
-// Swap the body of this hook with actual Butterbase client once you have credentials.
-// Fallback: polls every 2s (section 9 fallback ladder — looks identical on stage).
+import { useEffect, useState } from 'react'
+import { butterbase, butterbaseConfigured } from '../lib/butterbase'
 
 export function useRealtime(onUpdate) {
   useEffect(() => {
-    // TODO: replace with Butterbase channel subscription
-    // const channel = bb.channel('project:default')
-    // channel.on('graph_update', onUpdate).subscribe()
-    // return () => channel.unsubscribe()
+    if (!butterbaseConfigured || !butterbase) {
+      const id = setInterval(onUpdate, 2000)
+      return () => clearInterval(id)
+    }
 
-    // Polling fallback
-    const id = setInterval(onUpdate, 2000)
-    return () => clearInterval(id)
+    butterbase.realtime.connect()
+
+    const sub = butterbase.realtime.on('graph_events', () => {
+      onUpdate()
+    })
+
+    return () => {
+      sub.unsubscribe()
+      butterbase.realtime.disconnect()
+    }
   }, [onUpdate])
 }

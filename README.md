@@ -128,6 +128,23 @@ Also own the demo: finalize seed content, rehearse the 2-minute script, record a
 
 ## Setup
 
+### Butterbase (do this first — it's a dependency)
+
+1. Sign up at [dashboard.butterbase.ai](https://dashboard.butterbase.ai/) and redeem promo code `ENJOY0707` in billing.
+2. Create an app → copy **App ID**, **API key**, and **anon key**.
+3. Configure env files:
+   ```bash
+   cp backend/.env.example backend/.env      # paste App ID, API key, anon key
+   cp frontend/.env.example frontend/.env    # paste App ID + anon key
+   ```
+4. Bootstrap schema + realtime:
+   ```bash
+   cd backend && npm install && npm run setup:butterbase
+   ```
+5. Verify: `curl http://localhost:3001/health` → `butterbase.ok: true` (after `npm run dev`).
+
+### Full stack
+
 ```bash
 # 1. Neo4j — create free instance at neo4j.com/cloud/aura
 #    Paste seed.cypher in the Aura browser query box
@@ -136,10 +153,12 @@ Also own the demo: finalize seed content, rehearse the 2-minute script, record a
 cd backend
 cp .env.example .env   # fill in Neo4j, Butterbase, Anthropic, RocketRide keys
 npm install
+npm run setup:butterbase
 npm run dev
 
 # 3. Frontend
 cd frontend
+cp .env.example .env
 npm install
 npm run dev
 ```

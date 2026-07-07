@@ -3,6 +3,7 @@ import express from 'express'
 import cors from 'cors'
 import graphRouter from './routes/graph.js'
 import eventRouter from './routes/event.js'
+import { checkConnection, isConfigured } from './lib/butterbase.js'
 
 const app = express()
 app.use(cors())
@@ -10,6 +11,9 @@ app.use(express.json())
 
 app.use('/graph', graphRouter)
 app.use('/event', eventRouter)
-app.get('/health', (_, res) => res.json({ status: 'ok' }))
+app.get('/health', async (_, res) => {
+  const butterbase = isConfigured() ? await checkConnection() : { ok: false, error: 'not configured' }
+  res.json({ status: 'ok', butterbase })
+})
 
 app.listen(process.env.PORT || 3001, () => console.log('Hivemind backend ready'))

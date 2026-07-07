@@ -1,35 +1,46 @@
-// Butterbase realtime channel: "project:default"
-// Docs: check your Butterbase project dashboard for the JS client
+import { createClient } from '@butterbase/sdk'
 
-const BUTTERBASE_URL = process.env.BUTTERBASE_URL
-const BUTTERBASE_KEY = process.env.BUTTERBASE_API_KEY
+const appId = process.env.BUTTERBASE_APP_ID
+const apiUrl = process.env.BUTTERBASE_API_URL || 'https://api.butterbase.ai'
+const apiKey = process.env.BUTTERBASE_API_KEY
 
+let client = null
+
+function getClient() {
+  if (!appId || !apiKey) return null
+  if (!client) {
+    client = createClient({ appId, apiUrl })
+    client.setAccessToken(apiKey)
+  }
+  return client
+}
+
+export function isConfigured() {
+  return Boolean(appId && apiKey)
+}
+
+/** Insert a graph_events row — clients subscribe via Butterbase realtime. */
 export async function broadcast(event) {
-  if (!BUTTERBASE_URL || !BUTTERBASE_KEY) {
+  const bb = getClient()
+  if (!bb) {
     console.warn('[Butterbase] Not configured — skipping broadcast')
     return
   }
 
-  await fetch(`${BUTTERBASE_URL}/realtime/channels/project:default/publish`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${BUTTERBASE_KEY}`
-    },
-    body: JSON.stringify(event)
+  const { error } = await bb.from('graph_events').insert({
+    author: event.author,
+    intent: event.intent ?? 'update',
+    component: event.component ?? null
   })
+
+  if (error) throw error
 }
 
-// Call this on the frontend to subscribe
-// Replace with actual Butterbase client SDK once you have it
-export const CLIENT_SNIPPET = `
-import { createClient } from '@butterbase/js'
+export async function checkConnection() {
+  const bb = getClient()
+  if (!bb) return { ok: false, error: 'Missing BUTTERBASE_APP_ID or BUTTERBASE_API_KEY' }
 
-const bb = createClient(BUTTERBASE_URL, BUTTERBASE_ANON_KEY)
-
-export function subscribeToGraph(onUpdate) {
-  const channel = bb.channel('project:default')
-  channel.on('graph_update', onUpdate).subscribe()
-  return () => channel.unsubscribe()
+  const { error } = await bb.from('graph_events').select('id').limit(1)
+  if (error) return { ok: false, error: error.message }
+  return { ok: true }
 }
-`
