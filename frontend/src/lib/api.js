@@ -1,4 +1,22 @@
-const BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+const BUILD_TIME_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+
+/** Deployed frontend needs a public backend URL. Override via ?api=https://your-tunnel without redeploying. */
+export function getApiBase() {
+  if (typeof window === 'undefined') return BUILD_TIME_BASE
+
+  const params = new URLSearchParams(window.location.search)
+  const fromQuery = params.get('api')
+  if (fromQuery) {
+    const url = fromQuery.replace(/\/$/, '')
+    sessionStorage.setItem('hivemind_api_url', url)
+    return url
+  }
+
+  const stored = sessionStorage.getItem('hivemind_api_url')
+  if (stored) return stored
+
+  return BUILD_TIME_BASE
+}
 
 async function parseJson(res) {
   const text = await res.text()
@@ -8,7 +26,8 @@ async function parseJson(res) {
   } catch {
     if (text.trimStart().startsWith('<')) {
       throw new Error(
-        'Backend returned HTML instead of JSON — the API tunnel is probably down. Ask the host to restart the backend tunnel and redeploy.'
+        'Backend returned HTML instead of JSON — the API tunnel is down or the URL is wrong. ' +
+        'Host: restart `npx localtunnel --port 3001`, then open the app with `?api=<tunnel-url>` on the link you share.'
       )
     }
     throw new Error(`Invalid backend response: ${text.slice(0, 120)}`)
@@ -16,14 +35,15 @@ async function parseJson(res) {
 }
 
 async function apiFetch(path, options) {
+  const base = getApiBase()
   let res
   try {
-    res = await fetch(`${BASE}${path}`, options)
+    res = await fetch(`${base}${path}`, options)
   } catch {
     throw new Error(
-      BASE.includes('localhost')
-        ? 'Cannot reach the Hivemind backend. Make sure the host is running the backend on port 3001.'
-        : 'Cannot reach the Hivemind backend. The host may be offline or the API URL is misconfigured.'
+      base.includes('localhost')
+        ? 'Cannot reach the Hivemind backend. Run `cd backend && npm run dev` on port 3001.'
+        : `Cannot reach backend at ${base}. Host must run the backend + tunnel, or add ?api=<tunnel-url> to the link.`
     )
   }
   return res
