@@ -44,38 +44,62 @@ export default function Landing({ onSession }) {
   const [authErr,  setAuthErr]  = useState('')
   const [loading,  setLoading]  = useState(false)
   const [unlocked, setUnlocked] = useState(!billingConfigured())
+  const [authReady, setAuthReady] = useState(!butterbaseConfigured)
+  const [passChecked, setPassChecked] = useState(!billingConfigured())
   const [payErr,   setPayErr]   = useState('')
+
+  async function refreshTeamPass() {
+    if (!billingConfigured()) {
+      setUnlocked(true)
+      setPassChecked(true)
+      return
+    }
+    setPassChecked(false)
+    try {
+      setUnlocked(await hasTeamPass())
+    } catch (err) {
+      setUnlocked(false)
+      setPayErr(err.message)
+    } finally {
+      setPassChecked(true)
+    }
+  }
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     if (params.get('purchase') === 'success') {
       window.history.replaceState({}, '', window.location.pathname)
+      refreshTeamPass()
     }
   }, [])
 
   useEffect(() => {
     if (!butterbaseConfigured) return
+    let cancelled = false
     getCurrentUser().then(async user => {
+      if (cancelled) return
       setAuthUser(user)
       if (user?.email) setEmail(user.email)
-      if (user && billingConfigured()) {
-        try {
-          setUnlocked(await hasTeamPass())
-        } catch {
-          setUnlocked(false)
-        }
+      setAuthReady(true)
+      if (user) await refreshTeamPass()
+      else {
+        setUnlocked(false)
+        setPassChecked(true)
       }
     })
     if (!butterbase) return
     const { unsubscribe } = butterbase.onAuthStateChange((_event, session) => {
       setAuthUser(session?.user ?? null)
     })
-    return unsubscribe
+    return () => {
+      cancelled = true
+      unsubscribe()
+    }
   }, [])
 
   useEffect(() => {
     if (!authUser || !billingConfigured()) return
-    hasTeamPass().then(setUnlocked).catch(() => setUnlocked(false))
+    refreshTeamPass()
   }, [authUser])
 
   async function handleAuth(e) {
@@ -115,18 +139,25 @@ export default function Landing({ onSession }) {
   }
 
   async function handleCreate() {
+    setPayErr('')
     if (billingConfigured() && !authUser) {
       setPayErr('Sign in to create a hivemind')
       return
     }
+    if (billingConfigured() && !passChecked) {
+      setPayErr('Checking Team Pass status…')
+      return
+    }
     if (billingConfigured() && !unlocked) {
-      await handleUnlock()
+      setPayErr('Unlock a Team Pass first (free via Butterbase Payments)')
       return
     }
     setLoading(true)
     try {
       const { sessionId } = await createSession()
       onSession(sessionId, `${window.location.origin}?s=${sessionId}`)
+    } catch (err) {
+      setPayErr(err.message)
     } finally {
       setLoading(false)
     }
@@ -137,7 +168,9 @@ export default function Landing({ onSession }) {
     if (joinId.trim()) onSession(joinId.trim(), null)
   }
 
-  const needsUnlock = billingConfigured() && authUser && !unlocked
+  const needsUnlock = billingConfigured() && authReady && authUser && passChecked && !unlocked
+  const createReady = !billingConfigured() || (authReady && authUser && passChecked && unlocked)
+  const actionLoading = loading || (billingConfigured() && authUser && !passChecked)
 
   return (
     <div style={{ height: '100vh', background: bp.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: bp.font, color: bp.text }}>
@@ -202,17 +235,19 @@ export default function Landing({ onSession }) {
               <div style={{ fontSize: 9, color: bp.muted, letterSpacing: 1, marginBottom: 12, lineHeight: 1.5 }}>
                 {unlocked
                   ? 'Team Pass active — create a hivemind for your crew.'
-                  : 'Unlock via Butterbase Payments (Stripe Checkout) — $1 one-time Team Pass.'}
+                  : 'Unlock via Butterbase Payments (Stripe Checkout) — free Team Pass.'}
               </div>
             )}
             {payErr && <div style={{ fontSize: 10, color: '#fca5a5', marginBottom: 10, letterSpacing: 1 }}>{payErr}</div>}
-            {needsUnlock ? (
-              <button onClick={handleUnlock} disabled={loading} style={S.btn(true)}>
-                {loading ? 'REDIRECTING...' : 'UNLOCK TEAM PASS — $1'}
+            {!authReady && butterbaseConfigured ? (
+              <button disabled style={S.btn(true)}>CHECKING SESSION...</button>
+            ) : needsUnlock ? (
+              <button onClick={handleUnlock} disabled={actionLoading} style={S.btn(true)}>
+                {loading ? 'REDIRECTING...' : 'UNLOCK TEAM PASS — FREE'}
               </button>
             ) : (
-              <button onClick={handleCreate} disabled={loading} style={S.btn(true)}>
-                {loading ? 'CREATING...' : 'CREATE HIVEMIND'}
+              <button onClick={handleCreate} disabled={actionLoading || !createReady} style={S.btn(true)}>
+                {loading ? 'CREATING...' : actionLoading ? 'CHECKING PASS...' : 'CREATE HIVEMIND'}
               </button>
             )}
           </div>

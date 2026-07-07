@@ -62,7 +62,7 @@ Choose mode on entry:
    ```
 5. Verify: `curl http://localhost:3001/health` → `butterbase.ok: true` and `rocketride` status
 
-**Payments flow:** Session creators unlock a **Hivemind Team Pass** ($1, Stripe Checkout via Butterbase Payments) before creating a hivemind. Teammates join free via the shared link.
+**Payments flow:** Session creators unlock a **Hivemind Team Pass** (free $0 checkout via Butterbase Payments / Stripe) before creating a hivemind. Teammates join free via the shared link.
 
 ### RocketRide (Person D — see [rocketride/README.md](./rocketride/README.md))
 

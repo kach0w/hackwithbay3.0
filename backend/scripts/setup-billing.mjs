@@ -66,11 +66,11 @@ if (existing) {
   productId = existing.id
   console.log('✓ Team Pass product exists:', productId)
 } else {
-  console.log('→ Creating Hivemind Team Pass product ($1)…')
+  console.log('→ Creating Hivemind Team Pass product ($0)…')
   const { data: created, error } = await bb.billing.createProduct({
     name: 'Hivemind Team Pass',
     description: 'Unlock one shared hivemind session for your whole team',
-    priceCents: 100,
+    priceCents: 0,
     metadata: { sku: 'team_pass' }
   })
   if (error) {
