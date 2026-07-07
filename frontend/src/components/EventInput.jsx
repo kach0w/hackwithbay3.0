@@ -1,20 +1,14 @@
 import React, { useState } from 'react'
 import { postEvent } from '../lib/api'
 
-const AUTHORS = ['Shreeya', 'Frank', 'Ryan', 'Priya']
-
 const bp = {
-  bg: '#0d4f8c',
-  border: 'rgba(255,255,255,0.3)',
-  input: 'rgba(255,255,255,0.08)',
-  text: '#ffffff',
-  muted: 'rgba(255,255,255,0.45)',
-  font: "'Courier New', monospace",
+  bg: '#0d4f8c', border: 'rgba(255,255,255,0.3)',
+  input: 'rgba(255,255,255,0.08)', text: '#ffffff',
+  muted: 'rgba(255,255,255,0.45)', font: "'Courier New', monospace",
 }
 
-export default function EventInput({ onResult }) {
+export default function EventInput({ sessionId, author }) {
   const [text, setText] = useState('')
-  const [author, setAuthor] = useState('Shreeya')
   const [loading, setLoading] = useState(false)
   const [last, setLast] = useState(null)
 
@@ -23,9 +17,8 @@ export default function EventInput({ onResult }) {
     if (!text.trim()) return
     setLoading(true)
     try {
-      const result = await postEvent(text, author)
+      const result = await postEvent(sessionId, text, author)
       setLast(result)
-      onResult(result)
       setText('')
     } finally {
       setLoading(false)
@@ -36,23 +29,7 @@ export default function EventInput({ onResult }) {
     <div style={{ background: bp.bg, borderTop: `2px solid ${bp.border}`, padding: '12px 20px' }}>
       <form onSubmit={handleSubmit} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
         <span style={{ fontSize: 10, color: bp.muted, fontFamily: bp.font, letterSpacing: 2, whiteSpace: 'nowrap' }}>
-          AUTHOR
-        </span>
-        <select
-          value={author}
-          onChange={e => setAuthor(e.target.value)}
-          style={{
-            background: bp.input, color: bp.text,
-            border: `1px solid ${bp.border}`,
-            fontFamily: bp.font, fontSize: 12, letterSpacing: 1,
-            padding: '6px 8px', outline: 'none'
-          }}
-        >
-          {AUTHORS.map(a => <option key={a} style={{ background: '#0d4f8c' }}>{a}</option>)}
-        </select>
-
-        <span style={{ fontSize: 10, color: bp.muted, fontFamily: bp.font, letterSpacing: 2, whiteSpace: 'nowrap' }}>
-          DECISION
+          {author?.toUpperCase()}
         </span>
         <input
           value={text}
@@ -61,9 +38,8 @@ export default function EventInput({ onResult }) {
           disabled={loading}
           style={{
             flex: 1, background: bp.input, color: bp.text,
-            border: `1px solid ${bp.border}`,
-            fontFamily: bp.font, fontSize: 13, letterSpacing: 0.5,
-            padding: '6px 12px', outline: 'none',
+            border: `1px solid ${bp.border}`, fontFamily: bp.font,
+            fontSize: 13, padding: '6px 12px', outline: 'none',
           }}
         />
         <button
@@ -71,9 +47,9 @@ export default function EventInput({ onResult }) {
           disabled={loading || !text.trim()}
           style={{
             background: 'transparent', color: bp.text,
-            border: `1px solid ${bp.border}`,
-            fontFamily: bp.font, fontSize: 11, letterSpacing: 3,
-            padding: '6px 20px', cursor: loading ? 'wait' : 'pointer',
+            border: `1px solid ${bp.border}`, fontFamily: bp.font,
+            fontSize: 11, letterSpacing: 3, padding: '6px 20px',
+            cursor: loading ? 'wait' : 'pointer',
             opacity: (!text.trim() || loading) ? 0.4 : 1
           }}
         >
@@ -86,7 +62,7 @@ export default function EventInput({ onResult }) {
           INTENT: <span style={{ color: '#ffe066' }}>{last.intent?.toUpperCase()}</span>
           {last.affected?.length > 0 && (
             <span style={{ marginLeft: 20, color: '#ff9999' }}>
-              NOTIFY → {last.affected.map(a => a.notify.toUpperCase()).join(', ')}
+              NOTIFY → {last.affected.map(a => a.notify?.toUpperCase()).join(', ')}
             </span>
           )}
         </div>

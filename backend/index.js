@@ -3,12 +3,16 @@ import express from 'express'
 import cors from 'cors'
 import graphRouter from './routes/graph.js'
 import eventRouter from './routes/event.js'
+import sessionRouter from './routes/session.js'
+import joinRouter from './routes/join.js'
 import { checkConnection, isConfigured } from './lib/butterbase.js'
 
 const app = express()
 app.use(cors())
 app.use(express.json())
 
+app.use('/session', sessionRouter)
+app.use('/session', joinRouter)
 app.use('/graph', graphRouter)
 app.use('/event', eventRouter)
 app.get('/health', async (_, res) => {
