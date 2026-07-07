@@ -6,3 +6,4 @@ dist/
 # personal local notes
 DEPENDENCY_TREE.local.md
 *.local.md
+.rocketride/

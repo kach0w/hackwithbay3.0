@@ -3,8 +3,24 @@
     {
       "id": "webhook_1",
       "provider": "webhook",
-      "config": { "hideForm": true, "mode": "Source", "parameters": {}, "type": "webhook" },
-      "ui": { "position": { "x": 20, "y": 200 }, "measured": { "width": 150, "height": 66 }, "nodeType": "default", "formDataValid": true }
+      "config": {
+        "hideForm": true,
+        "mode": "Source",
+        "parameters": {},
+        "type": "webhook"
+      },
+      "ui": {
+        "position": {
+          "x": 20,
+          "y": 200
+        },
+        "measured": {
+          "width": 150,
+          "height": 66
+        },
+        "nodeType": "default",
+        "formDataValid": true
+      }
     },
     {
       "id": "prompt_1",
@@ -19,29 +35,85 @@
         ],
         "parameters": {}
       },
-      "input": [{ "lane": "text", "from": "webhook_1" }],
-      "ui": { "position": { "x": 240, "y": 200 }, "measured": { "width": 150, "height": 66 }, "nodeType": "default", "formDataValid": true }
+      "input": [
+        {
+          "lane": "text",
+          "from": "webhook_1"
+        }
+      ],
+      "ui": {
+        "position": {
+          "x": 240,
+          "y": 200
+        },
+        "measured": {
+          "width": 150,
+          "height": 66
+        },
+        "nodeType": "default",
+        "formDataValid": true
+      }
     },
     {
       "id": "llm_anthropic_1",
       "provider": "llm_anthropic",
       "config": {
-        "profile": "claude-haiku-4-5-20251001",
-        "claude-haiku-4-5-20251001": { "apikey": "${ROCKETRIDE_ANTHROPIC_KEY}" },
+        "profile": "claude-haiku-4-5",
+        "claude-haiku-4-5": {
+          "apikey": "${ROCKETRIDE_ANTHROPIC_KEY}"
+        },
         "parameters": {}
       },
-      "input": [{ "lane": "questions", "from": "prompt_1" }],
-      "ui": { "position": { "x": 460, "y": 200 }, "measured": { "width": 150, "height": 66 }, "nodeType": "default", "formDataValid": true }
+      "input": [
+        {
+          "lane": "questions",
+          "from": "prompt_1"
+        }
+      ],
+      "ui": {
+        "position": {
+          "x": 460,
+          "y": 200
+        },
+        "measured": {
+          "width": 150,
+          "height": 66
+        },
+        "nodeType": "default",
+        "formDataValid": true
+      }
     },
     {
       "id": "response_text_1",
       "provider": "response_text",
-      "config": { "laneName": "text" },
-      "input": [{ "lane": "text", "from": "llm_anthropic_1" }],
-      "ui": { "position": { "x": 680, "y": 200 }, "measured": { "width": 150, "height": 66 }, "nodeType": "default", "formDataValid": true }
+      "config": {
+        "laneName": "text"
+      },
+      "input": [
+        {
+          "lane": "text",
+          "from": "llm_anthropic_1"
+        }
+      ],
+      "ui": {
+        "position": {
+          "x": 680,
+          "y": 200
+        },
+        "measured": {
+          "width": 150,
+          "height": 66
+        },
+        "nodeType": "default",
+        "formDataValid": true
+      }
     }
   ],
-  "project_id": "hivemind-decision-extract",
-  "viewport": { "x": 0, "y": 0, "zoom": 1 },
+  "project_id": "52029664-93ea-4df5-9698-601a4377b2c0",
+  "viewport": {
+    "x": 0,
+    "y": 0,
+    "zoom": 1
+  },
   "version": 1
 }
