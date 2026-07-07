@@ -1,5 +1,20 @@
 const BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
+async function parseJson(res) {
+  const text = await res.text()
+  if (!text) return {}
+  try {
+    return JSON.parse(text)
+  } catch {
+    if (text.trimStart().startsWith('<')) {
+      throw new Error(
+        'Backend returned HTML instead of JSON — the API tunnel is probably down. Ask the host to restart the backend tunnel and redeploy.'
+      )
+    }
+    throw new Error(`Invalid backend response: ${text.slice(0, 120)}`)
+  }
+}
+
 async function apiFetch(path, options) {
   let res
   try {
@@ -16,7 +31,10 @@ async function apiFetch(path, options) {
 
 export async function createSession() {
   const res = await apiFetch('/session', { method: 'POST' })
-  return res.json()
+  const data = await parseJson(res)
+  if (!res.ok) throw new Error(data.error || 'Could not create session')
+  if (!data?.sessionId) throw new Error('Backend did not return a session id')
+  return data
 }
 
 export async function joinSession(sessionId, profile) {
@@ -25,24 +43,30 @@ export async function joinSession(sessionId, profile) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(profile)
   })
-  const data = await res.json()
+  const data = await parseJson(res)
   if (!res.ok) throw new Error(data.error || 'Join failed')
   return data
 }
 
 export async function fetchBrainstormGraph(sessionId) {
   const res = await apiFetch(`/graph/brainstorm/${sessionId}`)
-  return res.json()
+  const data = await parseJson(res)
+  if (!res.ok) throw new Error(data.error || 'Could not load brainstorm graph')
+  return data
 }
 
 export async function fetchProjectGraph(sessionId) {
   const res = await apiFetch(`/graph/project/${sessionId}`)
-  return res.json()
+  const data = await parseJson(res)
+  if (!res.ok) throw new Error(data.error || 'Could not load project graph')
+  return data
 }
 
 export async function recomputeOverlaps(sessionId) {
   const res = await apiFetch(`/graph/brainstorm/${sessionId}/overlaps`, { method: 'POST' })
-  return res.json()
+  const data = await parseJson(res)
+  if (!res.ok) throw new Error(data.error || 'Overlap recompute failed')
+  return data
 }
 
 export async function postEvent(sessionId, text, member) {
@@ -55,7 +79,7 @@ export async function postEvent(sessionId, text, member) {
       personId: member.personId
     })
   })
-  const data = await res.json()
+  const data = await parseJson(res)
   if (!res.ok) throw new Error(data.error || 'Event failed')
   return data
 }
