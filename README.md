@@ -59,7 +59,13 @@ Choose mode on entry:
    ```bash
    cd backend && npm install && npm run setup:butterbase
    ```
-5. Verify: `curl http://localhost:3001/health` → `butterbase.ok: true`
+5. Verify: `curl http://localhost:3001/health` → `butterbase.ok: true` and `rocketride` status
+
+### RocketRide (Person D — see [rocketride/README.md](./rocketride/README.md))
+
+1. Deploy `rocketride/hivemind-decision-extract.pipe` to [RocketRide Cloud](https://cloud.rocketride.ai/)
+2. Add `ROCKETRIDE_URI`, `ROCKETRIDE_APIKEY`, `ROCKETRIDE_ANTHROPIC_KEY` to `backend/.env`
+3. Restart backend — `POST /event` uses RocketRide first, falls back to local Anthropic
 
 ### Full stack
 
@@ -117,3 +123,7 @@ npm run dev
 3. Extraction flaky → use `CANNED` fallbacks in `backend/agents/extractor.js`
 4. Realtime flaky → `useRealtime.js` falls back to polling every 2s automatically
 5. **Always-working core:** two people join via shared link, their nodes appear on each other's screen live. Protect this above all else.
+
+---
+
+**Team completion plan:** [SCOPE.md](./SCOPE.md)

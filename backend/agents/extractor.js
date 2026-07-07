@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { extractViaRocketRide, isConfigured as rocketRideConfigured } from '../lib/rocketride.js'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -24,7 +25,7 @@ Output: {"intent":"notify","component":"user-service","tech":"","author":"Shreey
 
 Only return JSON. No explanation.`
 
-export async function extract(text, author) {
+async function extractLocal(text, author) {
   const response = await client.messages.create({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 200,
@@ -38,9 +39,28 @@ export async function extract(text, author) {
   return JSON.parse(match[0])
 }
 
-// Canned fallbacks for demo safety (section 9 of spec)
 export const CANNED = {
   supersede: { intent: 'supersede', component: 'user-service', tech: 'Neo4j', author: 'Shreeya', text: 'Switch user-service from Postgres to Neo4j' },
   notify:    { intent: 'notify',    component: 'user-service', tech: '',      author: 'Shreeya', text: 'user-service is changing' },
   add:       { intent: 'add',       component: 'frontend',     tech: 'Vite',  author: 'Frank',   text: 'Use Vite for frontend bundling' }
+}
+
+export async function extract(text, author) {
+  if (rocketRideConfigured()) {
+    try {
+      const result = await extractViaRocketRide(text, author)
+      console.log('[Extract] via RocketRide')
+      return { ...result, author: result.author || author }
+    } catch (err) {
+      console.warn('[Extract] RocketRide failed, falling back to local:', err.message)
+    }
+  }
+
+  if (process.env.ANTHROPIC_API_KEY) {
+    const result = await extractLocal(text, author)
+    console.log('[Extract] via local Anthropic')
+    return result
+  }
+
+  throw new Error('No extraction backend configured (RocketRide or ANTHROPIC_API_KEY)')
 }

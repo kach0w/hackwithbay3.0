@@ -1,0 +1,47 @@
+{
+  "components": [
+    {
+      "id": "webhook_1",
+      "provider": "webhook",
+      "config": { "hideForm": true, "mode": "Source", "parameters": {}, "type": "webhook" },
+      "ui": { "position": { "x": 20, "y": 200 }, "measured": { "width": 150, "height": 66 }, "nodeType": "default", "formDataValid": true }
+    },
+    {
+      "id": "prompt_1",
+      "provider": "prompt",
+      "config": {
+        "instructions": [
+          "You extract structured decisions from freeform project utterances.",
+          "Return ONLY valid JSON: {\"intent\":\"add|supersede|notify\",\"component\":string,\"tech\":string,\"author\":string,\"text\":string}",
+          "intent add = new decision; supersede = replaces existing; notify = who needs heads-up.",
+          "component should be a slug like user-service, frontend, auth-service, matching-engine, payments, notifications.",
+          "The input JSON has fields text and author — use author in your output."
+        ],
+        "parameters": {}
+      },
+      "input": [{ "lane": "text", "from": "webhook_1" }],
+      "ui": { "position": { "x": 240, "y": 200 }, "measured": { "width": 150, "height": 66 }, "nodeType": "default", "formDataValid": true }
+    },
+    {
+      "id": "llm_anthropic_1",
+      "provider": "llm_anthropic",
+      "config": {
+        "profile": "claude-haiku-4-5-20251001",
+        "claude-haiku-4-5-20251001": { "apikey": "${ROCKETRIDE_ANTHROPIC_KEY}" },
+        "parameters": {}
+      },
+      "input": [{ "lane": "questions", "from": "prompt_1" }],
+      "ui": { "position": { "x": 460, "y": 200 }, "measured": { "width": 150, "height": 66 }, "nodeType": "default", "formDataValid": true }
+    },
+    {
+      "id": "response_text_1",
+      "provider": "response_text",
+      "config": { "laneName": "text" },
+      "input": [{ "lane": "text", "from": "llm_anthropic_1" }],
+      "ui": { "position": { "x": 680, "y": 200 }, "measured": { "width": 150, "height": 66 }, "nodeType": "default", "formDataValid": true }
+    }
+  ],
+  "project_id": "hivemind-decision-extract",
+  "viewport": { "x": 0, "y": 0, "zoom": 1 },
+  "version": 1
+}
