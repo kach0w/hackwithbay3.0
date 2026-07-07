@@ -9,8 +9,8 @@ const router = Router()
 // POST /event/:sessionId { text, author }
 router.post('/:sessionId', async (req, res) => {
   const { sessionId } = req.params
-  const { text, author } = req.body
-  if (!text || !author) return res.status(400).json({ error: 'text and author required' })
+  const { text, author, personId } = req.body
+  if (!text || !author || !personId) return res.status(400).json({ error: 'text, author, and personId required' })
 
   try {
     const extracted = await extract(text, author)
@@ -20,13 +20,13 @@ router.post('/:sessionId', async (req, res) => {
 
     if (intent === 'add') {
       const id = `d_${randomUUID().slice(0, 8)}`
-      await addDecision(sessionId, { id, text: extracted.text, component, author })
+      await addDecision(sessionId, { id, text: extracted.text, component, author, personId })
       changed.nodes.push(id)
     }
 
     if (intent === 'supersede') {
       const id = `d_${randomUUID().slice(0, 8)}`
-      await supersedeDecision(sessionId, { id, text: extracted.text, component, author })
+      await supersedeDecision(sessionId, { id, text: extracted.text, component, author, personId })
       changed.nodes.push(id)
     }
 

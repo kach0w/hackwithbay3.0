@@ -73,10 +73,11 @@ Return JSON only:
 
     for (const personName of overlap.people) {
       await run(`
-        MATCH (p:Person {id: $personId})-[:IN_SESSION]->(s:Session {id: $sessionId})
+        MATCH (p:Person)-[:IN_SESSION]->(s:Session {id: $sessionId})
+        WHERE toLower(p.name) = toLower($personName)
         MATCH (o:Overlap {id: $overlapId})-[:IN_SESSION]->(s)
         MERGE (p)-[:OVERLAPS_WITH]->(o)
-      `, { sessionId, personId: `person_${personName.toLowerCase().replace(/\s+/g, '_')}`, overlapId: overlap.id })
+      `, { sessionId, personName, overlapId: overlap.id })
     }
   }
 

@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { addPerson, addSkillEdge, addDomainEdge } from '../../lib/neo4j.js'
+import { personIdForSession } from '../../lib/person-id.js'
 import { extractFromGitHub } from './github.js'
 import { extractFromLinkedIn } from './linkedin.js'
 import { extractFromWebsite } from './website.js'
@@ -85,8 +86,9 @@ Return JSON only:
   return match ? JSON.parse(match[0]) : {}
 }
 
-export async function ingestProfile(sessionId, { name, github, linkedin, website, interests }) {
-  const personId = `person_${name.toLowerCase().replace(/\s+/g, '_')}`
+export async function ingestProfile(sessionId, { userId, name, github, linkedin, website, interests }) {
+  if (!userId) throw new Error('userId required')
+  const personId = personIdForSession(sessionId, userId)
 
   console.log(`[Profile] Ingesting ${name}...`)
 
@@ -104,6 +106,7 @@ export async function ingestProfile(sessionId, { name, github, linkedin, website
 
   await addPerson(sessionId, {
     id: personId,
+    userId,
     name,
     github: github || '',
     archetype:           profile.archetype || '',

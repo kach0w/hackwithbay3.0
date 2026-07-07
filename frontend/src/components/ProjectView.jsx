@@ -4,7 +4,7 @@ import EventInput from './EventInput'
 import { fetchProjectGraph } from '../lib/api'
 import { useRealtime } from '../hooks/useRealtime'
 
-export default function ProjectView({ sessionId, author }) {
+export default function ProjectView({ sessionId, member }) {
   const [graph, setGraph] = useState({ nodes: [], edges: [] })
   const [highlightIds, setHighlightIds] = useState([])
 
@@ -30,7 +30,7 @@ export default function ProjectView({ sessionId, author }) {
       <div style={{ flex: 1, position: 'relative' }}>
         <GraphCanvas graph={graph} highlightIds={highlightIds} mode="project" />
       </div>
-      <EventInput sessionId={sessionId} author={author} onResult={handleResult} />
+      <EventInput sessionId={sessionId} member={member} onResult={handleResult} />
     </div>
   )
 }

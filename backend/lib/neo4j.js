@@ -100,11 +100,22 @@ function shapeNode(n) {
   }
 }
 
-export async function addPerson(sessionId, { id, name, github, synthesis, archetype, technical_depth, human_dimension, collaboration_style, strongest_in, curious_about, blind_spots, conversation_topics, skills, domains }) {
+export async function getPersonByUserId(sessionId, userId) {
+  const records = await run(`
+    MATCH (p:Person)-[:IN_SESSION]->(s:Session {id: $sessionId})
+    WHERE p.butterbase_user_id = $userId
+    RETURN p
+  `, { sessionId, userId })
+  if (!records.length) return null
+  return records[0].get('p').properties
+}
+
+export async function addPerson(sessionId, { id, userId, name, github, synthesis, archetype, technical_depth, human_dimension, collaboration_style, strongest_in, curious_about, blind_spots, conversation_topics, skills, domains }) {
   await run(`
     MATCH (s:Session {id: $sessionId})
     MERGE (p:Person {id: $id})
-    SET p.name = $name, p.label = $name, p.github = $github,
+    SET p.butterbase_user_id = $userId,
+        p.name = $name, p.label = $name, p.github = $github,
         p.synthesis = $synthesis, p.archetype = $archetype,
         p.technical_depth = $technical_depth,
         p.human_dimension = $human_dimension,
@@ -116,7 +127,7 @@ export async function addPerson(sessionId, { id, name, github, synthesis, archet
         p.skills = $skills, p.domains = $domains
     MERGE (p)-[:IN_SESSION]->(s)
   `, {
-    sessionId, id, name, github: github || '',
+    sessionId, id, userId: userId || '', name, github: github || '',
     synthesis: synthesis || '', archetype: archetype || '',
     technical_depth: technical_depth || '',
     human_dimension: human_dimension || '',
@@ -171,35 +182,33 @@ export async function addDomainEdge(sessionId, personId, domainName) {
   `, { sessionId, personId, domainId: `domain_${domainName.toLowerCase().replace(/\s+/g,'_')}`, domainName })
 }
 
-export async function addDecision(sessionId, { id, text, component, author }) {
+export async function addDecision(sessionId, { id, text, component, author, personId }) {
   await run(`
     MATCH (s:Session {id: $sessionId})
     MERGE (c:Component {id: $compId})-[:IN_SESSION]->(s)
     SET c.name = $component, c.label = $component
-    MERGE (p:Person {id: $authorId})-[:IN_SESSION]->(s)
-    SET p.name = $author
+    MATCH (p:Person {id: $personId})-[:IN_SESSION]->(s)
     CREATE (d:Decision {id: $id, text: $text, label: $text, ts: datetime(), deprecated: false})
     CREATE (d)-[:IN_SESSION]->(s)
     CREATE (d)-[:ABOUT]->(c)
     CREATE (p)-[:MADE]->(d)
-  `, { sessionId, id, text, component, compId: `comp_${component}`, author, authorId: `person_${author.toLowerCase()}` })
+  `, { sessionId, id, text, component, compId: `comp_${component}`, personId })
 }
 
-export async function supersedeDecision(sessionId, { id, text, component, author }) {
+export async function supersedeDecision(sessionId, { id, text, component, author, personId }) {
   await run(`
     MATCH (s:Session {id: $sessionId})
     MATCH (old:Decision)-[:ABOUT]->(c:Component {id: $compId})
     WHERE old.deprecated = false
     SET old.deprecated = true
     WITH old, c, s
-    MERGE (p:Person {id: $authorId})-[:IN_SESSION]->(s)
-    SET p.name = $author
+    MATCH (p:Person {id: $personId})-[:IN_SESSION]->(s)
     CREATE (new:Decision {id: $id, text: $text, label: $text, ts: datetime(), deprecated: false})
     CREATE (new)-[:IN_SESSION]->(s)
     CREATE (new)-[:ABOUT]->(c)
     CREATE (new)-[:SUPERSEDES]->(old)
     CREATE (p)-[:MADE]->(new)
-  `, { sessionId, id, text, component, compId: `comp_${component}`, author, authorId: `person_${author.toLowerCase()}` })
+  `, { sessionId, id, text, component, compId: `comp_${component}`, personId })
 }
 
 export async function inferAffected(sessionId, component) {

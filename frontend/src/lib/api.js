@@ -11,7 +11,9 @@ export async function joinSession(sessionId, profile) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(profile)
   })
-  return res.json()
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || 'Join failed')
+  return data
 }
 
 export async function fetchBrainstormGraph(sessionId) {
@@ -29,11 +31,15 @@ export async function recomputeOverlaps(sessionId) {
   return res.json()
 }
 
-export async function postEvent(sessionId, text, author) {
+export async function postEvent(sessionId, text, member) {
   const res = await fetch(`${BASE}/event/${sessionId}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, author })
+    body: JSON.stringify({
+      text,
+      author: member.name,
+      personId: member.personId
+    })
   })
   return res.json()
 }

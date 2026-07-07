@@ -7,7 +7,7 @@ const bp = {
   muted: 'rgba(255,255,255,0.45)', font: "'Courier New', monospace",
 }
 
-export default function EventInput({ sessionId, author }) {
+export default function EventInput({ sessionId, member, onResult }) {
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(false)
   const [last, setLast] = useState(null)
@@ -17,9 +17,10 @@ export default function EventInput({ sessionId, author }) {
     if (!text.trim()) return
     setLoading(true)
     try {
-      const result = await postEvent(sessionId, text, author)
+      const result = await postEvent(sessionId, text, member)
       setLast(result)
       setText('')
+      onResult?.(result)
     } finally {
       setLoading(false)
     }
@@ -29,7 +30,7 @@ export default function EventInput({ sessionId, author }) {
     <div style={{ background: bp.bg, borderTop: `2px solid ${bp.border}`, padding: '12px 20px' }}>
       <form onSubmit={handleSubmit} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
         <span style={{ fontSize: 10, color: bp.muted, fontFamily: bp.font, letterSpacing: 2, whiteSpace: 'nowrap' }}>
-          {author?.toUpperCase()}
+          {member?.name?.toUpperCase()}
         </span>
         <input
           value={text}

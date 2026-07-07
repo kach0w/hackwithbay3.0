@@ -29,7 +29,7 @@ function Tags({ label, items, color }) {
   )
 }
 
-export default function BrainstormView({ sessionId, author }) {
+export default function BrainstormView({ sessionId, member }) {
   const [graph, setGraph] = useState({ nodes: [], edges: [] })
   const [selected, setSelected] = useState(null)
   const [computing, setComputing] = useState(false)

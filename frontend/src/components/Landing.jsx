@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { createSession } from '../lib/api'
 import { butterbase, butterbaseConfigured } from '../lib/butterbase'
+import { getCurrentUser, signInOrUp } from '../lib/auth'
 
 const bp = {
   bg: '#1464b4', border: 'rgba(255,255,255,0.3)',
@@ -37,21 +38,32 @@ export default function Landing({ onSession }) {
   const [joinId,   setJoinId]   = useState('')
   const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
-  const [authMode, setAuthMode] = useState('login') // login | signup
+  const [authMode, setAuthMode] = useState('login')
+  const [authUser, setAuthUser] = useState(null)
   const [authErr,  setAuthErr]  = useState('')
-  const [authOk,   setAuthOk]   = useState(false)
   const [loading,  setLoading]  = useState(false)
+
+  useEffect(() => {
+    if (!butterbaseConfigured) return
+    getCurrentUser().then(user => {
+      setAuthUser(user)
+      if (user?.email) setEmail(user.email)
+    })
+    if (!butterbase) return
+    const { unsubscribe } = butterbase.onAuthStateChange((_event, session) => {
+      setAuthUser(session?.user ?? null)
+    })
+    return unsubscribe
+  }, [])
 
   async function handleAuth(e) {
     e.preventDefault()
-    if (!butterbaseConfigured || !butterbase) return
+    if (!butterbaseConfigured) return
     setAuthErr('')
     setLoading(true)
     try {
-      const fn = authMode === 'login' ? butterbase.auth.signIn : butterbase.auth.signUp
-      const { error } = await fn({ email, password })
-      if (error) { setAuthErr(error.message); setLoading(false); return }
-      setAuthOk(true)
+      const user = await signInOrUp({ email, password, mode: authMode })
+      setAuthUser(user)
     } catch (err) {
       setAuthErr(err.message)
     } finally {
@@ -59,11 +71,19 @@ export default function Landing({ onSession }) {
     }
   }
 
+  async function handleSignOut() {
+    if (butterbase) await butterbase.auth.signOut()
+    setAuthUser(null)
+  }
+
   async function handleCreate() {
     setLoading(true)
-    const { sessionId } = await createSession()
-    onSession(sessionId, `${window.location.origin}?s=${sessionId}`)
-    setLoading(false)
+    try {
+      const { sessionId } = await createSession()
+      onSession(sessionId, `${window.location.origin}?s=${sessionId}`)
+    } finally {
+      setLoading(false)
+    }
   }
 
   function handleJoin(e) {
@@ -82,18 +102,25 @@ export default function Landing({ onSession }) {
 
       <div style={{ display: 'flex', gap: 24, position: 'relative', alignItems: 'flex-start' }}>
 
-        {/* Auth panel */}
         {butterbaseConfigured && (
           <div style={{ ...S.panel, width: 300 }}>
-            {authOk ? (
-              <div style={{ fontSize: 11, color: '#86efac', letterSpacing: 2, textAlign: 'center', padding: '8px 0' }}>
-                SIGNED IN ✓
+            {authUser ? (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 11, color: '#86efac', letterSpacing: 2, marginBottom: 12 }}>
+                  SIGNED IN ✓
+                </div>
+                <div style={{ fontSize: 10, color: bp.muted, letterSpacing: 1, marginBottom: 16 }}>
+                  {authUser.email}
+                </div>
+                <button type="button" onClick={handleSignOut} style={S.btn(false)}>
+                  SIGN OUT
+                </button>
               </div>
             ) : (
               <>
                 <div style={{ display: 'flex', marginBottom: 16, gap: 0 }}>
-                  {['login','signup'].map(m => (
-                    <button key={m} onClick={() => setAuthMode(m)} style={{
+                  {['login', 'signup'].map(m => (
+                    <button key={m} type="button" onClick={() => setAuthMode(m)} style={{
                       flex: 1, background: 'transparent', color: authMode === m ? bp.text : bp.muted,
                       border: 'none', borderBottom: `1px solid ${authMode === m ? bp.text : 'rgba(255,255,255,0.15)'}`,
                       fontFamily: bp.font, fontSize: 10, letterSpacing: 3, padding: '8px', cursor: 'pointer'
@@ -103,8 +130,13 @@ export default function Landing({ onSession }) {
                   ))}
                 </div>
                 <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <input value={email} onChange={e => setEmail(e.target.value)} placeholder="EMAIL" type="email" style={S.input} />
-                  <input value={password} onChange={e => setPassword(e.target.value)} placeholder="PASSWORD" type="password" style={S.input} />
+                  <input value={email} onChange={e => setEmail(e.target.value)} placeholder="EMAIL" type="email" required style={S.input} />
+                  <input value={password} onChange={e => setPassword(e.target.value)} placeholder="PASSWORD" type="password" minLength={8} required style={S.input} />
+                  {authMode === 'signup' && (
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', letterSpacing: 1 }}>
+                      8+ chars with upper, lower, number, and special character
+                    </div>
+                  )}
                   {authErr && <div style={{ fontSize: 10, color: '#fca5a5', letterSpacing: 1 }}>{authErr}</div>}
                   <button type="submit" disabled={loading} style={S.btn(true)}>
                     {loading ? '...' : authMode === 'login' ? 'SIGN IN' : 'CREATE ACCOUNT'}
@@ -115,7 +147,6 @@ export default function Landing({ onSession }) {
           </div>
         )}
 
-        {/* Session panels */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, width: 300 }}>
           <div style={S.panel}>
             <span style={S.label}>NEW SESSION</span>
