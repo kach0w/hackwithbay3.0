@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { quickJoinProfile, enrichProfile } from '../agents/ingestion/profile.js'
+import { maybeAutoComputeSession, assignSkillOwnership } from '../agents/ingestion/session-sync.js'
 import { broadcast } from '../lib/butterbase.js'
 import { getPersonByUserId } from '../lib/neo4j.js'
 
@@ -7,6 +8,8 @@ const router = Router()
 
 function enrichInBackground(sessionId, payload, author) {
   enrichProfile(sessionId, payload)
+    .then(() => assignSkillOwnership(sessionId))
+    .then(() => maybeAutoComputeSession(sessionId, author))
     .then(() => broadcast({ type: 'graph_update', author, event: 'enrich', sessionId }))
     .catch(err => console.warn('[join] enrich:', err.message))
 }

@@ -77,6 +77,10 @@ export default function Onboarding({ sessionId, shareUrl, onJoined }) {
   async function handleSubmit(e) {
     e.preventDefault()
     if (!form.name.trim()) return
+    if (!form.github.trim()) {
+      setError('GitHub username required — we read your repos to find team overlaps')
+      return
+    }
     if (needsAuth && (!email.trim() || !password)) {
       setError('Email and password required')
       return
@@ -133,8 +137,8 @@ export default function Onboarding({ sessionId, shareUrl, onJoined }) {
           </div>
           <div style={{ fontSize: 10, color: bp.muted, letterSpacing: 1, marginTop: 4 }}>
             {localDemo
-              ? 'Local demo — no sign-in needed. Use incognito for each teammate.'
-              : 'Name + GitHub — skills populate after a few seconds.'}
+              ? 'Local demo — join with GitHub; overlaps + project graph auto-build when teammates join.'
+              : 'GitHub required — skills, overlaps, and project graph populate automatically.'}
           </div>
         </div>
 
@@ -187,7 +191,7 @@ export default function Onboarding({ sessionId, shareUrl, onJoined }) {
 
           <button
             type="submit"
-            disabled={loading || !form.name.trim()}
+            disabled={loading || !form.name.trim() || !form.github.trim()}
             style={{
               width: '100%', background: loading ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.1)',
               color: loading ? bp.muted : bp.text, border: `1px solid ${bp.border}`,

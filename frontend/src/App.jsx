@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import Landing from './components/Landing'
 import Onboarding from './components/Onboarding'
-import ModeSelect from './components/ModeSelect'
 import BrainstormView from './components/BrainstormView'
 import ProjectView from './components/ProjectView'
 import { butterbase, butterbaseConfigured } from './lib/butterbase'
@@ -25,7 +24,7 @@ export default function App() {
   const [sessionId, setSessionId] = useState(null)
   const [shareUrl,  setShareUrl]  = useState(null)
   const [member,    setMember]    = useState(null)
-  const [mode,      setMode]      = useState(null) // null | 'brainstorm' | 'project'
+  const [mode,      setMode]      = useState('brainstorm') // 'brainstorm' | 'project'
 
   useEffect(() => {
     const s = parseSessionId(new URLSearchParams(window.location.search).get('s') || '')
@@ -33,7 +32,10 @@ export default function App() {
       setSessionId(s)
       setShareUrl(shareUrlFor(s))
       const saved = loadMember(s)
-      if (saved?.personId) setMember(saved)
+      if (saved?.personId) {
+        setMember(saved)
+        setMode('brainstorm')
+      }
     }
   }, [])
 
@@ -47,6 +49,7 @@ export default function App() {
 
   const handleJoined = useCallback((nextMember) => {
     setMember(nextMember)
+    setMode('brainstorm')
   }, [])
 
   async function handleSignOut() {
@@ -55,12 +58,11 @@ export default function App() {
       await butterbase.auth.signOut()
     }
     setMember(null)
-    setMode(null)
+    setMode('brainstorm')
   }
 
   if (!sessionId)          return <Landing    onSession={handleSession} />
   if (!member)             return <Onboarding sessionId={sessionId} shareUrl={shareUrl} onJoined={handleJoined} />
-  if (!mode)               return <ModeSelect onSelect={setMode} />
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#1464b4', color: '#fff' }}>

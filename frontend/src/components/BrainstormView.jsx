@@ -126,11 +126,17 @@ export default function BrainstormView({ sessionId, member }) {
               border: '1px solid rgba(255,220,80,0.4)', fontFamily: bp.font,
               fontSize: 9, letterSpacing: 1, padding: '2px 8px', cursor: 'pointer'
             }}>
-              {computing ? '...' : 'RECOMPUTE'}
+              {computing ? '...' : 'REFRESH'}
             </button>
           </div>
           {overlaps.length === 0
-            ? <div style={{ fontSize: 10, color: bp.muted }}>JOIN 2+ PEOPLE TO FIND OVERLAPS</div>
+            ? <div style={{ fontSize: 10, color: bp.muted, lineHeight: 1.5 }}>
+                {people.length < 2
+                  ? 'SHARE LINK — OVERLAPS APPEAR WHEN 2+ PEOPLE JOIN'
+                  : people.some(p => p.github && (!p.skills || p.skills.length === 0))
+                    ? 'INGESTING GITHUB — OVERLAPS AUTO-COMPUTE WHEN READY'
+                    : 'COMPUTING OVERLAPS FROM READMES...'}
+              </div>
             : overlaps.map(o => (
               <div key={o.id} style={{ marginBottom: 8, padding: 8, border: '1px solid rgba(253,230,138,0.2)', cursor: 'pointer' }} onClick={() => setSelected(o)}>
                 <div style={{ fontSize: 11, color: '#fde68a', letterSpacing: 0.5 }}>{o.label}</div>

@@ -298,6 +298,13 @@ export async function extractFromGitHub(username) {
       description: r.description,
       pushed_at: r.pushed_at,
       hasReadme: Boolean(r.readmeText)
+    })),
+    projectDigest: enriched.map(r => ({
+      name: r.name,
+      description: r.description || '',
+      pushed_at: r.pushed_at,
+      languages: r.languages || [],
+      readme: r.readmeText ? stripMarkdown(r.readmeText).slice(0, 800) : ''
     }))
   }
 }

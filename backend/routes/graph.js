@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { fetchBrainstormGraph, fetchProjectGraph } from '../lib/neo4j.js'
 import { computeOverlaps } from '../agents/ingestion/overlap.js'
+import { bridgeOverlapsToProject, assignSkillOwnership } from '../agents/ingestion/session-sync.js'
 import { broadcast } from '../lib/butterbase.js'
 
 const router = Router()
@@ -27,8 +28,10 @@ router.post('/brainstorm/:sessionId/overlaps', async (req, res) => {
   try {
     const { sessionId } = req.params
     const overlaps = await computeOverlaps(sessionId)
+    await assignSkillOwnership(sessionId)
+    const bridged = await bridgeOverlapsToProject(sessionId)
     await broadcast({ type: 'graph_update', author: 'system', intent: 'overlaps', sessionId })
-    res.json({ overlaps })
+    res.json({ overlaps, bridged })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

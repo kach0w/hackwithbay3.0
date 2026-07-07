@@ -135,7 +135,7 @@ export async function getPersonByUserId(sessionId, userId) {
   return records[0].get('p').properties
 }
 
-export async function addPerson(sessionId, { id, userId, name, github, synthesis, archetype, technical_depth, human_dimension, collaboration_style, strongest_in, curious_about, blind_spots, conversation_topics, skills, domains }) {
+export async function addPerson(sessionId, { id, userId, name, github, synthesis, archetype, technical_depth, human_dimension, collaboration_style, strongest_in, curious_about, blind_spots, conversation_topics, skills, domains, project_digest }) {
   await run(`
     MATCH (s:Session {id: $sessionId})
     MERGE (p:Person {id: $id})
@@ -149,7 +149,8 @@ export async function addPerson(sessionId, { id, userId, name, github, synthesis
         p.curious_about = $curious_about,
         p.blind_spots = $blind_spots,
         p.conversation_topics = $conversation_topics,
-        p.skills = $skills, p.domains = $domains
+        p.skills = $skills, p.domains = $domains,
+        p.project_digest = $project_digest
     MERGE (p)-[:IN_SESSION]->(s)
   `, {
     sessionId, id, userId: userId || '', name, github: github || '',
@@ -161,7 +162,8 @@ export async function addPerson(sessionId, { id, userId, name, github, synthesis
     curious_about: curious_about || [],
     blind_spots: blind_spots || [],
     conversation_topics: conversation_topics || [],
-    skills, domains
+    skills, domains,
+    project_digest: project_digest || '[]'
   })
 }
 

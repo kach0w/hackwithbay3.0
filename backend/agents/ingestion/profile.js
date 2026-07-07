@@ -70,7 +70,8 @@ async function loadSources({ name, github, linkedin }) {
       ...(ghData.recentProjects || []).slice(0, 3).map(p => p.name)
     ].slice(0, 6),
     githubError: ghData.error || null,
-    repoCount: ghData.repoCount || 0
+    repoCount: ghData.repoCount || 0,
+    projectDigest: ghData.projectDigest || []
   }
 }
 
@@ -92,7 +93,8 @@ async function writeProfile(sessionId, { personId, userId, name, github, profile
     blind_spots: [],
     conversation_topics: profile.conversation_topics,
     skills: profile.skills,
-    domains: profile.domains
+    domains: profile.domains,
+    project_digest: JSON.stringify(profile.projectDigest || [])
   })
 
   await Promise.all([
