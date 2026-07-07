@@ -8,9 +8,29 @@
 
 ## What it does
 
+- **Team graph** — each person joins via a shared link, connects their GitHub and shares their interests, and their profile is ingested into a live graph showing the team's collective skills and domains
 - **Self-correction** — type a new decision; the old one greys out with a strikethrough and a `SUPERSEDES` edge links them
-- **Realtime sync** — two teammates share one brain, changes appear live on both screens (Butterbase)
+- **Realtime sync** — everyone shares one brain, changes appear live on all screens (Butterbase)
 - **Dependency inference** — "who do I need to warn?" traverses the graph and names the people who own downstream components (Neo4j)
+
+---
+
+## User Flow
+
+```
+Creator → POST /session → gets session ID
+        → shares link: hivemind.app?s=abc123
+
+Teammate clicks link
+        → Onboarding form (name, GitHub, LinkedIn, Twitter, interests)
+        → Profile ingested → Person node + Skill/Domain nodes appear on graph live
+        → Lands on graph, sees full team
+
+Anyone on the graph → types a decision → Claude extracts intent
+        → add: new Decision node blooms
+        → supersede: old Decision greys out + X + SUPERSEDES edge
+        → notify: graph highlights who owns affected components
+```
 
 ---
 
@@ -18,10 +38,11 @@
 
 | Layer | Technology | Role |
 |---|---|---|
-| Graph brain | **Neo4j Aura** | Stores decisions, components, people, and traverses dependency chains |
-| Auth + realtime | **Butterbase** | Email/password auth + realtime channel that syncs graph updates across all clients |
-| Extraction pipeline | **RocketRide** | Runs the utterance → structured decision pipeline (intent classification + LLM extraction) |
-| Frontend | React + react-force-graph-2d | Live force-directed graph with animations for new nodes, deprecated decisions, inference highlights |
+| Graph brain | **Neo4j Aura** | Stores people, skills, decisions, components — traverses dependency chains |
+| Auth + realtime | **Butterbase** | Email/password auth + realtime `graph_events` table syncs all clients live |
+| Extraction pipeline | **RocketRide** | Runs the utterance → structured decision pipeline (intent classification + LLM) |
+| Profile ingestion | **Claude + GitHub API** | Extracts skills and domains from GitHub repos, stars, and self-reported interests |
+| Frontend | React + react-force-graph-2d | Blueprint-aesthetic force-directed graph, Landing → Onboarding → Graph routing |
 
 ---
 
@@ -30,161 +51,173 @@
 ### Person A — Neo4j Graph Layer
 **Own:** `backend/lib/neo4j.js`, `backend/seed.cypher`
 
-Set up Neo4j Aura free instance. Implement the schema and all 4 graph operations:
-1. `fetchGraph()` — returns full graph as `{ nodes, edges }` per Contract 1
-2. `addDecision()` — creates a new Decision node linked to a Component and Person
-3. `supersedeDecision()` — sets old decision `deprecated: true`, creates `SUPERSEDES` edge
-4. `inferAffected()` — multi-hop traversal: who owns components that depend on the changed one?
+Session-scoped graph — every node is linked to a `Session` node so multiple teams don't bleed into each other.
 
-Run `seed.cypher` in Neo4j Aura browser before the demo to pre-populate the graph.
+Implement all graph operations:
+1. `createSession(sessionId)` — create a new session node
+2. `fetchGraph(sessionId)` — returns all nodes + edges scoped to this session
+3. `addPerson / addSkillEdge / addDomainEdge` — build person profiles as they join
+4. `addDecision / supersedeDecision` — decision lifecycle
+5. `inferAffected(sessionId, component)` — multi-hop traversal: who owns things that depend on this?
 
-**Acceptance:** seeded graph loads in browser; supersede flips `deprecated` flag; inference returns correct people.
+**Acceptance:** two sessions don't share nodes; supersede flips `deprecated`; inference fans out correctly.
 
 ---
 
 ### Person B — Backend API + Butterbase Realtime
 **Own:** `backend/routes/`, `backend/lib/butterbase.js`, `backend/index.js`
 
-Build the thin API layer tying frontend → RocketRide extraction → Neo4j → Butterbase broadcast.
+API layer: frontend → RocketRide extraction → Neo4j → Butterbase broadcast.
 
-- `GET /graph` — proxy Neo4j fetchGraph, return Contract 1 shape
-- `POST /event` — receive `{ text, author }`, call RocketRide extraction pipeline (Contract 4), call the right Neo4j op, then broadcast `{ type: "graph_update", author }` on Butterbase channel `project:default`
+- `POST /session` — create session, return `{ sessionId }`
+- `POST /session/:id/join` — ingest profile, broadcast `graph_update`
+- `GET /graph/:sessionId` — return session graph (Contract 1)
+- `POST /event/:sessionId` — extract intent, write to Neo4j, broadcast
 
 Wire **Butterbase** for:
-- Email/password auth (gate the app behind login)
-- Realtime channel: publish `graph_update` on every write so all connected clients refetch
+- Email/password auth via `AuthGate` (already scaffolded)
+- Insert into `graph_events` table on every write → realtime subscription triggers refetch on all clients
 
-**Acceptance:** two browsers stay in sync; a write from one triggers an update on the other; login gates the app.
+**Acceptance:** two browsers stay in sync; joining triggers live graph update on other screens.
 
 ---
 
 ### Person C — Frontend Graph Visualization
 **Own:** `frontend/src/`
 
-Build the React SPA. This is 40% of the demo score — make it beautiful.
+Three-screen flow: Landing → Onboarding → Graph. Blueprint aesthetic throughout.
 
-- Force-directed graph from `GET /graph` using `react-force-graph-2d`
-- Node colors by type: Person (blue), Component (green), Decision (yellow)
-- Three animations:
-  1. New node fades + scales in
-  2. `deprecated: true` nodes render greyed with strikethrough label + timestamp
-  3. Inference highlight mode pulses red on affected node IDs for 4s
-- Text input at the bottom POSTs to `POST /event`
-- Subscribe to **Butterbase** realtime channel `project:default` — refetch graph on `graph_update`
+- **Landing** — create session or paste session ID to join
+- **Onboarding** — name, GitHub, LinkedIn, Twitter, interests form; shows share link to copy
+- **Graph** — blueprint force-directed graph with:
+  - Person nodes (blue), Skill nodes (teal), Domain nodes (yellow), Decision nodes (white), Component nodes (green)
+  - Deprecated nodes: greyed, X through box, timestamp below
+  - Inference highlight: yellow pulsing border on affected nodes for 4s
+  - COPY LINK button in header
+  - `COMMIT` input at bottom for decisions
 
-**Acceptance:** seeded graph renders; typing a decision animates a new node; deprecated items look retired; two windows stay in sync without refresh.
+Subscribe to **Butterbase** `graph_events` realtime — refetch on every event (already wired in `useRealtime.js`).
+
+**Acceptance:** joining via shared link goes straight to onboarding; graph builds live as teammates join; decisions animate correctly.
 
 ---
 
 ### Person D — RocketRide Extraction Pipeline + Demo
-**Own:** `backend/agents/extractor.js` + demo script + backup video
+**Own:** `backend/agents/extractor.js` + `backend/agents/ingestion/` + demo script + backup video
 
-Build the extraction step as a **RocketRide pipeline**: given a freeform utterance, return Contract 4 JSON `{ intent, component, tech, author, text }`.
+Two pipelines on **RocketRide**:
 
-Three intents:
-- `add` — new decision, no conflict
-- `supersede` — replaces an existing decision
-- `notify` — who needs a heads-up (no new decision created)
+**Pipeline 1 — Profile ingestion** (`backend/agents/ingestion/profile.js`)
+- Takes GitHub username + interests text
+- Calls GitHub API for repos + stars
+- Claude extracts skills, domains, summary
+- Writes to Neo4j via Person A's functions
 
-Use a tight system prompt with few-shot examples (see `extractor.js`). Deploy on RocketRide so Person B can call it as a pipeline endpoint rather than a direct LLM call. Keep `CANNED` fallbacks in the file for demo safety.
+**Pipeline 2 — Decision extraction** (`backend/agents/extractor.js`)
+- Takes freeform utterance + author
+- Returns `{ intent, component, tech, author, text }` (Contract 4)
+- Three intents: `add`, `supersede`, `notify`
+- Keep `CANNED` fallbacks for demo safety
 
-Also own the demo: finalize seed content, rehearse the 2-minute script, record a backup video by 15:10.
+Also own the demo: rehearse the join flow with two laptops, record backup video by 15:10.
 
-**Acceptance:** all 3 scripted demo utterances return correct intent JSON; backup recording exists.
+**Acceptance:** GitHub ingestion populates skill/domain nodes; extraction returns correct intent for all 3 demo utterances.
 
 ---
 
 ## API Contracts
 
-**Contract 1 — `GET /graph`**
+**Contract 1 — `GET /graph/:sessionId`**
 ```json
 {
   "nodes": [
-    { "id": "c_user", "type": "Component", "label": "user-service", "deprecated": false },
-    { "id": "d_pg",   "type": "Decision",  "label": "Use Postgres", "deprecated": true, "ts": "..." }
+    { "id": "person_karthik", "type": "Person",    "label": "Karthik",      "skills": ["Python","Neo4j"], "deprecated": false },
+    { "id": "skill_python",   "type": "Skill",     "label": "Python",       "deprecated": false },
+    { "id": "d_pg",           "type": "Decision",  "label": "Use Postgres", "deprecated": true, "ts": "..." }
   ],
   "edges": [
-    { "id": "e1", "source": "d_pg", "target": "c_user", "type": "ABOUT", "deprecated": true }
+    { "source": "person_karthik", "target": "skill_python", "type": "HAS_SKILL" },
+    { "source": "d_pg",           "target": "c_user",       "type": "ABOUT",     "deprecated": true }
   ]
 }
 ```
 
-**Contract 2 — `POST /event`**
+**Contract 2 — `POST /session/:id/join`**
 ```json
-{ "text": "switching user-service from Postgres to Neo4j", "author": "Shreeya" }
+{ "name": "Karthik", "github": "kach0w", "linkedin": "...", "twitter": "...", "interests": "..." }
 ```
 
-**Contract 3 — Butterbase realtime (`project:default` channel)**
+**Contract 3 — Butterbase realtime (`graph_events` table)**
 ```json
-{ "type": "graph_update", "author": "Shreeya" }
+{ "author": "Karthik", "intent": "join", "component": null }
 ```
 
 **Contract 4 — RocketRide extraction output**
 ```json
-{ "intent": "supersede", "component": "user-service", "tech": "Neo4j", "author": "Shreeya", "text": "..." }
-```
-
----
-
-## Setup
-
-### Butterbase (do this first — it's a dependency)
-
-1. Sign up at [dashboard.butterbase.ai](https://dashboard.butterbase.ai/) and redeem promo code `ENJOY0707` in billing.
-2. Create an app → copy **App ID**, **API key**, and **anon key**.
-3. Configure env files:
-   ```bash
-   cp backend/.env.example backend/.env      # paste App ID, API key, anon key
-   cp frontend/.env.example frontend/.env    # paste App ID + anon key
-   ```
-4. Bootstrap schema + realtime:
-   ```bash
-   cd backend && npm install && npm run setup:butterbase
-   ```
-5. Verify: `curl http://localhost:3001/health` → `butterbase.ok: true` (after `npm run dev`).
-
-### Full stack
-
-```bash
-# 1. Neo4j — create free instance at neo4j.com/cloud/aura
-#    Paste seed.cypher in the Aura browser query box
-
-# 2. Backend
-cd backend
-cp .env.example .env   # fill in Neo4j, Butterbase, Anthropic, RocketRide keys
-npm install
-npm run setup:butterbase
-npm run dev
-
-# 3. Frontend
-cd frontend
-cp .env.example .env
-npm install
-npm run dev
+{ "intent": "supersede", "component": "user-service", "tech": "Neo4j", "author": "Karthik", "text": "..." }
 ```
 
 ---
 
 ## Graph Schema
 
-**Nodes:** `Person {name}` · `Component {name}` · `Decision {id, text, ts, deprecated}`
+**Nodes:** `Session {id}` · `Person {name, github, skills, domains, summary}` · `Skill {name}` · `Domain {name}` · `Component {name}` · `Decision {id, text, ts, deprecated}`
 
-**Edges:** `OWNS` · `MADE` · `ABOUT` · `SUPERSEDES` · `DEPENDS_ON`
+**Edges:** `IN_SESSION` · `HAS_SKILL` · `INTERESTED_IN` · `OWNS` · `MADE` · `ABOUT` · `SUPERSEDES` · `DEPENDS_ON`
+
+---
+
+## Setup
+
+### Butterbase (do this first)
+
+1. Sign up at [dashboard.butterbase.ai](https://dashboard.butterbase.ai/) and redeem promo code `ENJOY0707` in billing
+2. Create an app → copy **App ID**, **API key**, and **anon key**
+3. Fill env files:
+   ```bash
+   cp backend/.env.example backend/.env
+   cp frontend/.env.example frontend/.env
+   ```
+4. Bootstrap schema + realtime:
+   ```bash
+   cd backend && npm install && npm run setup:butterbase
+   ```
+5. Verify: `curl http://localhost:3001/health` → `butterbase.ok: true`
+
+### Full stack
+
+```bash
+# Neo4j — create free instance at neo4j.com/cloud/aura
+
+# Backend
+cd backend
+cp .env.example .env   # fill in Neo4j, Butterbase, Anthropic, RocketRide keys
+npm install
+npm run setup:butterbase
+npm run dev
+
+# Frontend (new terminal)
+cd frontend
+cp .env.example .env
+npm install
+npm run dev
+# open localhost:5173
+```
 
 ---
 
 ## Sponsor Story (say this to judges)
 
-- **Neo4j** — the decision graph, temporal `SUPERSEDES` edges, and the multi-hop dependency traversal that finds who's affected. The textbook "why a graph."
-- **Butterbase** — auth + the realtime channel that syncs one project brain across teammates live. Hard to fake on stage.
-- **RocketRide** — the extraction pipeline that turns a freeform utterance into a structured decision with intent classification.
+- **Neo4j** — the session-scoped team graph, skill/domain traversal, temporal `SUPERSEDES` edges, and multi-hop dependency inference. The textbook "why a graph" — a flat DB cannot answer "who do I need to warn?"
+- **Butterbase** — auth gates the app; realtime `graph_events` table syncs every join and decision across all open browsers instantly. The two-laptop demo moment is Butterbase.
+- **RocketRide** — two pipelines: profile ingestion (GitHub → skills → graph) and decision extraction (utterance → intent → Neo4j write). The intelligence layer.
 
 ---
 
 ## Fallback Ladder
 
-If something breaks during the demo, in order:
-1. Extraction flaky → use `CANNED` fallbacks in `extractor.js`
-2. Realtime flaky → frontend polls `GET /graph` every 2s (already wired in `useRealtime.js`)
-3. Traversal hard → precompute inference answer for `user-service`
-4. **Always-working core:** seeded graph + supersede beat. Protect this above all else.
+1. GitHub ingestion slow → show self-reported interests only, graph still populates
+2. Extraction flaky → use `CANNED` fallbacks in `extractor.js`
+3. Realtime flaky → `useRealtime.js` falls back to polling every 2s automatically
+4. Traversal hard → precompute inference answer for `user-service`
+5. **Always-working core:** two people join via shared link, their nodes appear on each other's screen. Protect this above all else.
