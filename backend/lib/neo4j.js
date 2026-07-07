@@ -19,6 +19,33 @@ export async function createSession(sessionId) {
   await run(`MERGE (s:Session {id: $sessionId})`, { sessionId })
 }
 
+function buildGraph(records) {
+  const nodesMap = {}
+  const edgesMap = {}
+
+  for (const rec of records) {
+    const n = rec.get('n')
+    const m = rec.get('m')
+    const r = rec.get('r')
+    if (n && !nodesMap[n.elementId]) nodesMap[n.elementId] = shapeNode(n)
+    if (m && !nodesMap[m.elementId]) nodesMap[m.elementId] = shapeNode(m)
+    if (r && !edgesMap[r.elementId]) {
+      edgesMap[r.elementId] = {
+        id: r.elementId,
+        source: nodesMap[n.elementId]?.id,
+        target: nodesMap[m?.elementId]?.id,
+        type: r.type,
+        deprecated: r.properties.deprecated || false
+      }
+    }
+  }
+
+  return {
+    nodes: Object.values(nodesMap).filter(n => n.id),
+    edges: Object.values(edgesMap).filter(e => e.source && e.target)
+  }
+}
+
 export async function fetchGraph(sessionId) {
   const records = await run(`
     MATCH (n)-[:IN_SESSION]->(s:Session {id: $sessionId})
@@ -73,14 +100,43 @@ function shapeNode(n) {
   }
 }
 
-export async function addPerson(sessionId, { id, name, github, summary, skills, domains }) {
+export async function addPerson(sessionId, { id, name, github, synthesis, archetype, strongest_in, curious_about, working_style, skills, domains }) {
   await run(`
     MATCH (s:Session {id: $sessionId})
     MERGE (p:Person {id: $id})
-    SET p.name = $name, p.github = $github, p.summary = $summary,
-        p.skills = $skills, p.domains = $domains
+    SET p.name = $name, p.github = $github,
+        p.synthesis = $synthesis, p.archetype = $archetype,
+        p.strongest_in = $strongest_in, p.curious_about = $curious_about,
+        p.working_style = $working_style,
+        p.skills = $skills, p.domains = $domains,
+        p.label = $name
     MERGE (p)-[:IN_SESSION]->(s)
-  `, { sessionId, id, name, github: github || '', summary: summary || '', skills, domains })
+  `, { sessionId, id, name, github: github || '', synthesis: synthesis || '',
+       archetype: archetype || '', strongest_in: strongest_in || [],
+       curious_about: curious_about || [], working_style: working_style || '',
+       skills, domains })
+}
+
+export async function fetchBrainstormGraph(sessionId) {
+  const records = await run(`
+    MATCH (n)-[:IN_SESSION]->(s:Session {id: $sessionId})
+    WHERE n:Person OR n:Skill OR n:Domain OR n:Overlap
+    OPTIONAL MATCH (n)-[r]->(m)-[:IN_SESSION]->(s)
+    WHERE m:Person OR m:Skill OR m:Domain OR m:Overlap
+    RETURN n, r, m
+  `, { sessionId })
+  return buildGraph(records)
+}
+
+export async function fetchProjectGraph(sessionId) {
+  const records = await run(`
+    MATCH (n)-[:IN_SESSION]->(s:Session {id: $sessionId})
+    WHERE n:Person OR n:Component OR n:Decision
+    OPTIONAL MATCH (n)-[r]->(m)
+    WHERE (m)-[:IN_SESSION]->(s) AND (m:Person OR m:Component OR m:Decision)
+    RETURN n, r, m
+  `, { sessionId })
+  return buildGraph(records)
 }
 
 export async function addSkillEdge(sessionId, personId, skillName) {
