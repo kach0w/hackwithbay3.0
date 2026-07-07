@@ -138,19 +138,21 @@ export default function Landing({ onSession }) {
     }
   }
 
-  async function handleCreate() {
+  async function handleCreate({ bypassBilling = false } = {}) {
     setPayErr('')
-    if (billingConfigured() && !authUser) {
-      setPayErr('Sign in to create a hivemind')
-      return
-    }
-    if (billingConfigured() && !passChecked) {
-      setPayErr('Checking Team Pass status…')
-      return
-    }
-    if (billingConfigured() && !unlocked) {
-      setPayErr('Unlock a Team Pass first (free via Butterbase Payments)')
-      return
+    if (billingConfigured() && !bypassBilling) {
+      if (!authUser) {
+        setPayErr('Sign in to create a hivemind')
+        return
+      }
+      if (!passChecked) {
+        setPayErr('Checking Team Pass status…')
+        return
+      }
+      if (!unlocked) {
+        setPayErr('Unlock a Team Pass first (free via Butterbase Payments)')
+        return
+      }
     }
     setLoading(true)
     try {
@@ -168,8 +170,6 @@ export default function Landing({ onSession }) {
     if (joinId.trim()) onSession(joinId.trim(), null)
   }
 
-  const needsUnlock = billingConfigured() && authReady && authUser && passChecked && !unlocked
-  const createReady = !billingConfigured() || (authReady && authUser && passChecked && unlocked)
   const actionLoading = loading || (billingConfigured() && authUser && !passChecked)
 
   return (
@@ -241,14 +241,26 @@ export default function Landing({ onSession }) {
             {payErr && <div style={{ fontSize: 10, color: '#fca5a5', marginBottom: 10, letterSpacing: 1 }}>{payErr}</div>}
             {!authReady && butterbaseConfigured ? (
               <button disabled style={S.btn(true)}>CHECKING SESSION...</button>
-            ) : needsUnlock ? (
-              <button onClick={handleUnlock} disabled={actionLoading} style={S.btn(true)}>
-                {loading ? 'REDIRECTING...' : 'UNLOCK TEAM PASS — FREE'}
-              </button>
             ) : (
-              <button onClick={handleCreate} disabled={actionLoading || !createReady} style={S.btn(true)}>
-                {loading ? 'CREATING...' : actionLoading ? 'CHECKING PASS...' : 'CREATE HIVEMIND'}
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <button
+                  onClick={() => handleCreate({ bypassBilling: true })}
+                  disabled={loading}
+                  style={S.btn(true)}
+                >
+                  {loading ? 'CREATING...' : unlocked ? 'CREATE HIVEMIND' : 'ENTER SERVICE'}
+                </button>
+                {billingConfigured() && authUser && passChecked && !unlocked && (
+                  <button onClick={handleUnlock} disabled={actionLoading} style={S.btn(false)}>
+                    {loading ? 'REDIRECTING...' : 'UNLOCK TEAM PASS — FREE'}
+                  </button>
+                )}
+                {billingConfigured() && !unlocked && (
+                  <div style={{ fontSize: 9, color: bp.muted, letterSpacing: 1, lineHeight: 1.45, textAlign: 'center' }}>
+                    Team Pass checkout is optional for now — enter service directly while Stripe is being connected.
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
