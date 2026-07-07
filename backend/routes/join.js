@@ -1,10 +1,15 @@
 import { Router } from 'express'
-import { ingestProfile } from '../agents/ingestion/profile.js'
-import { computeOverlaps } from '../agents/ingestion/overlap.js'
+import { quickJoinProfile, enrichProfile } from '../agents/ingestion/profile.js'
 import { broadcast } from '../lib/butterbase.js'
 import { getPersonByUserId } from '../lib/neo4j.js'
 
 const router = Router()
+
+function enrichInBackground(sessionId, payload, author) {
+  enrichProfile(sessionId, payload)
+    .then(() => broadcast({ type: 'graph_update', author, event: 'enrich', sessionId }))
+    .catch(err => console.warn('[join] enrich:', err.message))
+}
 
 router.post('/:sessionId/join', async (req, res) => {
   const { sessionId } = req.params
@@ -26,23 +31,28 @@ router.post('/:sessionId/join', async (req, res) => {
       })
     }
 
-    const result = await ingestProfile(sessionId, {
+    const payload = {
       userId,
       name,
       github,
       linkedin,
       personId: existing?.id
-    })
+    }
 
-    computeOverlaps(sessionId)
-      .then(() => broadcast({ type: 'graph_update', author: name, event: 'overlaps', sessionId }))
-      .catch(err => console.warn('[join] overlap compute:', err.message))
+    const result = await quickJoinProfile(sessionId, payload)
 
-    await broadcast({ type: 'graph_update', author: name, event: 'join', sessionId })
+    broadcast({ type: 'graph_update', author: name, event: 'join', sessionId })
+      .catch(err => console.warn('[join] broadcast:', err.message))
+
+    if (github?.trim() || linkedin?.trim()) {
+      enrichInBackground(sessionId, { ...payload, personId: result.personId }, name)
+    }
+
     res.json({
       success: true,
       alreadyJoined: Boolean(existing),
       ...result,
+      enriching: Boolean(github?.trim() || linkedin?.trim()),
       overlaps: []
     })
   } catch (err) {

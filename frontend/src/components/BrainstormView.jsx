@@ -110,6 +110,9 @@ export default function BrainstormView({ sessionId, member }) {
               <div key={p.id} style={{ marginBottom: 10, padding: 8, border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer' }} onClick={() => setSelected(p)}>
                 <div style={{ fontSize: 11, color: '#fff', letterSpacing: 1 }}>{p.label}</div>
                 {p.archetype && <div style={{ fontSize: 9, color: bp.muted, letterSpacing: 1, marginTop: 2 }}>{p.archetype.toUpperCase()}</div>}
+                {p.github && (!p.skills || p.skills.length === 0) && (
+                  <div style={{ fontSize: 8, color: '#fde68a', letterSpacing: 1, marginTop: 4 }}>GITHUB ENRICHING...</div>
+                )}
               </div>
             ))
           }

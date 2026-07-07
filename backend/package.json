@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch index.js",
+    "demo": "bash ../scripts/local-demo.sh",
     "setup:butterbase": "node scripts/setup-butterbase.mjs",
     "setup:billing": "node scripts/setup-billing.mjs",
     "publish:api-url": "node scripts/publish-api-url.mjs",

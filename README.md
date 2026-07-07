@@ -70,7 +70,17 @@ Choose mode on entry:
 2. Add `ROCKETRIDE_URI`, `ROCKETRIDE_APIKEY`, `ROCKETRIDE_ANTHROPIC_KEY` to `backend/.env`
 3. Restart backend — `POST /event` uses RocketRide first, falls back to local Anthropic
 
-### Full stack
+### Quick demo (recommended for hackathon)
+
+See **[DEMO.md](./DEMO.md)** for the 5-minute judge script.
+
+```bash
+# Fill backend/.env + frontend/.env first, then:
+./scripts/local-demo.sh
+# → http://localhost:5173
+```
+
+### Full stack (manual)
 
 ```bash
 # Neo4j — create free instance at neo4j.com/cloud/aura

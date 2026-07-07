@@ -76,8 +76,9 @@ async function pickWorkingUrl(candidates) {
     return hit.url
   }
 
+  // Drop stale cached tunnel URLs so the next load re-fetches from Butterbase.
+  sessionStorage.removeItem(STORAGE_KEY)
   resolvedBase = unique[0]
-  sessionStorage.setItem(STORAGE_KEY, unique[0])
   return unique[0]
 }
 
@@ -89,10 +90,19 @@ export async function initApiBase() {
   if (initPromise) return initPromise
 
   initPromise = (async () => {
+    const local = normalizeUrl(BUILD_TIME_BASE)
+    const host = window.location.hostname
+    if (host === 'localhost' || host === '127.0.0.1') {
+      if (await probe(local)) {
+        resolvedBase = local
+        sessionStorage.removeItem(STORAGE_KEY)
+        return local
+      }
+    }
+
     const query = fromQuery()
     const remote = await fromButterbase()
     const stored = fromStorage()
-    const local = normalizeUrl(BUILD_TIME_BASE)
 
     if (query) {
       if (await probe(query)) {
@@ -102,7 +112,9 @@ export async function initApiBase() {
       }
     }
 
-    return pickWorkingUrl([remote, query, stored, local].filter(Boolean))
+    // Prefer Butterbase over sessionStorage — cached tunnels die when host restarts.
+    const storedOk = stored && await probe(stored) ? stored : null
+    return pickWorkingUrl([remote, query, storedOk, local].filter(Boolean))
   })()
 
   return initPromise

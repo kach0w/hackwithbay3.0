@@ -7,7 +7,7 @@ export function useRealtime(onUpdate) {
       Promise.resolve(onUpdate()).catch(err => {
         console.warn('[realtime] poll update failed:', err.message)
       })
-    }, 2000)
+    }, 4000)
 
     if (!butterbaseConfigured || !butterbase?.realtime) {
       return () => clearInterval(pollId)

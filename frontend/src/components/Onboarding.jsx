@@ -3,6 +3,8 @@ import { joinSession } from '../lib/api'
 import { butterbase, butterbaseConfigured } from '../lib/butterbase'
 import { getCurrentUser, signInOrUp } from '../lib/auth'
 import { getOrCreateDevUserId, loadMember, saveMember } from '../lib/member'
+import { isLocalDemo } from '../lib/local-demo'
+import { shareUrlFor } from '../lib/session-id'
 
 const bp = {
   bg: '#1464b4', border: 'rgba(255,255,255,0.3)',
@@ -44,7 +46,8 @@ export default function Onboarding({ sessionId, shareUrl, onJoined }) {
   const [copied, setCopied] = useState(false)
 
   const set = key => val => setForm(f => ({ ...f, [key]: val }))
-  const needsAuth = butterbaseConfigured && !authUser
+  const localDemo = isLocalDemo()
+  const needsAuth = butterbaseConfigured && !authUser && !localDemo
 
   useEffect(() => {
     const stored = loadMember(sessionId)
@@ -62,13 +65,13 @@ export default function Onboarding({ sessionId, shareUrl, onJoined }) {
   }, [sessionId, onJoined])
 
   async function resolveUserId() {
-    if (butterbaseConfigured) {
-      if (authUser?.id) return authUser.id
-      const user = await signInOrUp({ email, password, mode: authMode })
-      setAuthUser(user)
-      return user.id
+    if (localDemo || !butterbaseConfigured) {
+      return getOrCreateDevUserId()
     }
-    return getOrCreateDevUserId()
+    if (authUser?.id) return authUser.id
+    const user = await signInOrUp({ email, password, mode: authMode })
+    setAuthUser(user)
+    return user.id
   }
 
   async function handleSubmit(e) {
@@ -85,7 +88,7 @@ export default function Onboarding({ sessionId, shareUrl, onJoined }) {
 
     try {
       const userId = await resolveUserId()
-      setStatus('BUILDING PROFILE...')
+      setStatus('JOINING...')
       const result = await joinSession(sessionId, {
         userId,
         name: form.name.trim(),
@@ -94,11 +97,14 @@ export default function Onboarding({ sessionId, shareUrl, onJoined }) {
       })
 
       if (result.githubError) {
-        setError(`GitHub: ${result.githubError} — joined with other data`)
+        setError(`GitHub: ${result.githubError} — add GITHUB_TOKEN to backend/.env if rate limited`)
+      } else if (result.enriching) {
+        setStatus('FETCHING GITHUB READMES...')
       }
 
       const member = { name: form.name.trim(), userId, personId: result.personId }
       saveMember(sessionId, member)
+      setLoading(false)
       if (!result.githubError) onJoined(member)
       else setTimeout(() => onJoined(member), 1500)
     } catch (err) {
@@ -109,7 +115,7 @@ export default function Onboarding({ sessionId, shareUrl, onJoined }) {
   }
 
   function copyLink() {
-    navigator.clipboard.writeText(shareUrl || `${window.location.origin}?s=${sessionId}`)
+    navigator.clipboard.writeText(shareUrl || shareUrlFor(sessionId))
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -126,14 +132,16 @@ export default function Onboarding({ sessionId, shareUrl, onJoined }) {
             {needsAuth ? 'JOIN HIVEMIND' : 'YOUR PROFILE'}
           </div>
           <div style={{ fontSize: 10, color: bp.muted, letterSpacing: 1, marginTop: 4 }}>
-            Name, GitHub, and optional LinkedIn.
+            {localDemo
+              ? 'Local demo — no sign-in needed. Use incognito for each teammate.'
+              : 'Name + GitHub — skills populate after a few seconds.'}
           </div>
         </div>
 
-        {shareUrl && (
+        {(shareUrl || sessionId) && (
           <div style={{ border: `1px solid ${bp.border}`, padding: '10px 14px', marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 10, color: bp.muted, letterSpacing: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 280 }}>
-              {shareUrl}
+              {shareUrl || shareUrlFor(sessionId)}
             </span>
             <button type="button" onClick={copyLink} style={{ background: 'transparent', color: copied ? '#ffe066' : bp.muted, border: 'none', fontFamily: bp.font, fontSize: 10, letterSpacing: 2, cursor: 'pointer', whiteSpace: 'nowrap', marginLeft: 8 }}>
               {copied ? 'COPIED' : 'COPY LINK'}

@@ -6,6 +6,7 @@ import BrainstormView from './components/BrainstormView'
 import ProjectView from './components/ProjectView'
 import { butterbase, butterbaseConfigured } from './lib/butterbase'
 import { clearMember, loadMember } from './lib/member'
+import { parseSessionId, shareUrlFor } from './lib/session-id'
 
 const bp = {
   header: {
@@ -27,18 +28,21 @@ export default function App() {
   const [mode,      setMode]      = useState(null) // null | 'brainstorm' | 'project'
 
   useEffect(() => {
-    const s = new URLSearchParams(window.location.search).get('s')
+    const s = parseSessionId(new URLSearchParams(window.location.search).get('s') || '')
     if (s) {
       setSessionId(s)
+      setShareUrl(shareUrlFor(s))
       const saved = loadMember(s)
       if (saved?.personId) setMember(saved)
     }
   }, [])
 
   function handleSession(id, url) {
-    setSessionId(id)
-    setShareUrl(url)
-    if (url) window.history.replaceState({}, '', `?s=${id}`)
+    const parsed = parseSessionId(id)
+    setSessionId(parsed)
+    const link = url || shareUrlFor(parsed)
+    setShareUrl(link)
+    window.history.replaceState({}, '', `?s=${parsed}`)
   }
 
   const handleJoined = useCallback((nextMember) => {

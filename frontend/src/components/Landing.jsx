@@ -4,6 +4,8 @@ import { getApiBase, setApiBase } from '../lib/api-config'
 import { butterbase, butterbaseConfigured } from '../lib/butterbase'
 import { getCurrentUser, signInOrUp } from '../lib/auth'
 import { billingConfigured, hasTeamPass, startTeamPassCheckout } from '../lib/billing'
+import { isLocalDemo } from '../lib/local-demo'
+import { parseSessionId, shareUrlFor } from '../lib/session-id'
 
 const bp = {
   bg: '#1464b4', border: 'rgba(255,255,255,0.3)',
@@ -50,6 +52,7 @@ export default function Landing({ onSession }) {
   const [payErr,   setPayErr]   = useState('')
   const [backendUrl, setBackendUrl] = useState('')
   const [apiStatus, setApiStatus] = useState('')
+  const localDemo = isLocalDemo()
 
   useEffect(() => {
     setBackendUrl(getApiBase())
@@ -179,7 +182,7 @@ export default function Landing({ onSession }) {
     setLoading(true)
     try {
       const { sessionId } = await createSession()
-      onSession(sessionId, `${window.location.origin}?s=${sessionId}`)
+      onSession(sessionId, shareUrlFor(sessionId))
     } catch (err) {
       setPayErr(err.message)
     } finally {
@@ -189,7 +192,8 @@ export default function Landing({ onSession }) {
 
   function handleJoin(e) {
     e.preventDefault()
-    if (joinId.trim()) onSession(joinId.trim(), null)
+    const id = parseSessionId(joinId)
+    if (id) onSession(id, shareUrlFor(id))
   }
 
   const actionLoading = loading || (billingConfigured() && authUser && !passChecked)
@@ -201,12 +205,22 @@ export default function Landing({ onSession }) {
       <div style={{ textAlign: 'center', marginBottom: 52, position: 'relative' }}>
         <div style={{ fontSize: 36, letterSpacing: 10, fontWeight: 700 }}>HIVEMIND</div>
         <div style={{ fontSize: 10, color: bp.muted, letterSpacing: 5, marginTop: 10 }}>SHARED PROJECT MEMORY SYSTEM</div>
+        {localDemo && (
+          <div style={{ fontSize: 9, color: '#86efac', letterSpacing: 2, marginTop: 14 }}>
+            LOCAL DEMO — open share link in incognito for each teammate
+          </div>
+        )}
       </div>
 
       <div style={{ display: 'flex', gap: 24, position: 'relative', alignItems: 'flex-start' }}>
 
         {butterbaseConfigured && (
           <div style={{ ...S.panel, width: 300 }}>
+            {localDemo && (
+              <div style={{ fontSize: 9, color: '#86efac', letterSpacing: 1, marginBottom: 12, lineHeight: 1.5 }}>
+                Sign-in optional for local demo — use incognito per teammate.
+              </div>
+            )}
             {authUser ? (
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: 11, color: '#86efac', letterSpacing: 2, marginBottom: 12 }}>
@@ -251,6 +265,7 @@ export default function Landing({ onSession }) {
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, width: 300 }}>
+          {!localDemo && (
           <div style={S.panel}>
             <span style={S.label}>BACKEND URL (HOST)</span>
             <div style={{ fontSize: 9, color: bp.muted, letterSpacing: 1, marginBottom: 10, lineHeight: 1.45 }}>
@@ -273,10 +288,16 @@ export default function Landing({ onSession }) {
               </button>
             </form>
           </div>
+          )}
 
           <div style={S.panel}>
             <span style={S.label}>NEW SESSION</span>
-            {billingConfigured() && (
+            {localDemo && (
+              <div style={{ fontSize: 9, color: '#86efac', letterSpacing: 1, marginBottom: 12, lineHeight: 1.5 }}>
+                ENTER SERVICE → copy share link → open in incognito for each teammate.
+              </div>
+            )}
+            {billingConfigured() && !localDemo && (
               <div style={{ fontSize: 9, color: bp.muted, letterSpacing: 1, marginBottom: 12, lineHeight: 1.5 }}>
                 {unlocked
                   ? 'Team Pass active — create a hivemind for your crew.'
@@ -295,12 +316,12 @@ export default function Landing({ onSession }) {
                 >
                   {loading ? 'CREATING...' : unlocked ? 'CREATE HIVEMIND' : 'ENTER SERVICE'}
                 </button>
-                {billingConfigured() && authUser && passChecked && !unlocked && (
+                {billingConfigured() && !localDemo && authUser && passChecked && !unlocked && (
                   <button onClick={handleUnlock} disabled={actionLoading} style={S.btn(false)}>
                     {loading ? 'REDIRECTING...' : 'UNLOCK TEAM PASS — FREE'}
                   </button>
                 )}
-                {billingConfigured() && !unlocked && (
+                {billingConfigured() && !localDemo && !unlocked && (
                   <div style={{ fontSize: 9, color: bp.muted, letterSpacing: 1, lineHeight: 1.45, textAlign: 'center' }}>
                     Team Pass checkout is optional for now — enter service directly while Stripe is being connected.
                   </div>
