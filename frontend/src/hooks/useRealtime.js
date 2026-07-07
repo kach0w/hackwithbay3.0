@@ -3,23 +3,36 @@ import { butterbase, butterbaseConfigured } from '../lib/butterbase'
 
 export function useRealtime(onUpdate) {
   useEffect(() => {
-    // Fallback ladder: always poll so sync works even if Butterbase WS is down.
-    const pollId = setInterval(onUpdate, 2000)
+    const pollId = setInterval(() => {
+      Promise.resolve(onUpdate()).catch(err => {
+        console.warn('[realtime] poll update failed:', err.message)
+      })
+    }, 2000)
 
-    if (!butterbaseConfigured || !butterbase) {
+    if (!butterbaseConfigured || !butterbase?.realtime) {
       return () => clearInterval(pollId)
     }
 
-    butterbase.realtime.connect()
-
-    const sub = butterbase.realtime.on('graph_events', () => {
-      onUpdate()
-    })
+    let sub = null
+    try {
+      butterbase.realtime.connect()
+      sub = butterbase.realtime.on('graph_events', () => {
+        Promise.resolve(onUpdate()).catch(err => {
+          console.warn('[realtime] push update failed:', err.message)
+        })
+      })
+    } catch (err) {
+      console.warn('[realtime] subscription failed:', err.message)
+    }
 
     return () => {
       clearInterval(pollId)
-      sub.unsubscribe()
-      butterbase.realtime.disconnect()
+      try {
+        sub?.unsubscribe?.()
+        butterbase.realtime.disconnect()
+      } catch {
+        // ignore cleanup errors
+      }
     }
   }, [onUpdate])
 }

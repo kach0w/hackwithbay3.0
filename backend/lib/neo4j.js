@@ -165,6 +165,14 @@ export async function addPerson(sessionId, { id, userId, name, github, synthesis
   })
 }
 
+export async function clearPersonSkills(sessionId, personId) {
+  await run(`
+    MATCH (p:Person {id: $personId})-[:IN_SESSION]->(s:Session {id: $sessionId})
+    OPTIONAL MATCH (p)-[r:HAS_SKILL|INTERESTED_IN]->()
+    DELETE r
+  `, { sessionId, personId })
+}
+
 export async function addSkillEdge(sessionId, personId, skillName) {
   await run(`
     MATCH (s:Session {id: $sessionId})

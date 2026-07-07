@@ -5,7 +5,7 @@ import ModeSelect from './components/ModeSelect'
 import BrainstormView from './components/BrainstormView'
 import ProjectView from './components/ProjectView'
 import { butterbase, butterbaseConfigured } from './lib/butterbase'
-import { clearMember } from './lib/member'
+import { clearMember, loadMember } from './lib/member'
 
 const bp = {
   header: {
@@ -28,7 +28,11 @@ export default function App() {
 
   useEffect(() => {
     const s = new URLSearchParams(window.location.search).get('s')
-    if (s) setSessionId(s)
+    if (s) {
+      setSessionId(s)
+      const saved = loadMember(s)
+      if (saved?.personId) setMember(saved)
+    }
   }, [])
 
   function handleSession(id, url) {
@@ -102,7 +106,7 @@ export default function App() {
         </div>
       </header>
 
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
         {mode === 'brainstorm'
           ? <BrainstormView sessionId={sessionId} member={member} />
           : <ProjectView    sessionId={sessionId} member={member} />

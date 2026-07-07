@@ -1,13 +1,14 @@
-import React, { useState, useCallback, useEffect } from 'react'
-import GraphCanvas from './GraphCanvas'
+import React, { useState, useCallback, useEffect, Suspense } from 'react'
 import { fetchBrainstormGraph, recomputeOverlaps } from '../lib/api'
 import { useRealtime } from '../hooks/useRealtime'
+
+const GraphCanvas = React.lazy(() => import('./GraphCanvas'))
 
 const bp = { font: "'Courier New', monospace", muted: 'rgba(255,255,255,0.5)', border: 'rgba(255,255,255,0.3)' }
 
 function Section({ label, color, children }) {
   return (
-    <div style={{ marginBottom: 12, borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 10 }}>
+    <div style={{ marginBottom: 12, paddingTop: 4 }}>
       <div style={{ fontSize: 9, color: bp.muted, letterSpacing: 2, marginBottom: 4 }}>{label}</div>
       <div style={{ fontSize: 10, color, lineHeight: 1.65 }}>{children}</div>
     </div>
@@ -15,11 +16,13 @@ function Section({ label, color, children }) {
 }
 
 function Tags({ label, items, color }) {
+  const list = Array.isArray(items) ? items : []
+  if (!list.length) return null
   return (
     <div style={{ marginBottom: 10 }}>
       <div style={{ fontSize: 9, color: bp.muted, letterSpacing: 2, marginBottom: 5 }}>{label}</div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-        {items.map(item => (
+        {list.map(item => (
           <span key={item} style={{ fontSize: 9, color, border: `1px solid ${color}`, padding: '2px 6px', letterSpacing: 0.5, opacity: 0.85 }}>
             {item}
           </span>
@@ -33,10 +36,22 @@ export default function BrainstormView({ sessionId, member }) {
   const [graph, setGraph] = useState({ nodes: [], edges: [] })
   const [selected, setSelected] = useState(null)
   const [computing, setComputing] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   const load = useCallback(async () => {
-    const data = await fetchBrainstormGraph(sessionId)
-    setGraph(data)
+    try {
+      const data = await fetchBrainstormGraph(sessionId)
+      setGraph({
+        nodes: Array.isArray(data?.nodes) ? data.nodes : [],
+        edges: Array.isArray(data?.edges) ? data.edges : []
+      })
+      setError('')
+    } catch (err) {
+      setError(err.message || 'Could not load brainstorm graph')
+    } finally {
+      setLoading(false)
+    }
   }, [sessionId])
 
   useEffect(() => { load() }, [load])
@@ -44,18 +59,42 @@ export default function BrainstormView({ sessionId, member }) {
 
   async function handleRecompute() {
     setComputing(true)
-    await recomputeOverlaps(sessionId)
-    await load()
-    setComputing(false)
+    try {
+      await recomputeOverlaps(sessionId)
+      await load()
+    } catch (err) {
+      setError(err.message || 'Overlap recompute failed')
+    } finally {
+      setComputing(false)
+    }
   }
 
-  const people  = graph.nodes.filter(n => n.type === 'Person')
-  const overlaps = graph.nodes.filter(n => n.type === 'Overlap')
+  const nodes = graph.nodes || []
+  const people  = nodes.filter(n => n.type === 'Person')
+  const overlaps = nodes.filter(n => n.type === 'Overlap')
 
   return (
-    <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-      <div style={{ flex: 1, position: 'relative' }}>
-        <GraphCanvas graph={graph} mode="brainstorm" onNodeClick={setSelected} />
+    <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0, background: '#1464b4' }}>
+      <div style={{ flex: 1, position: 'relative', minWidth: 0, minHeight: 0 }}>
+        {error && (
+          <div style={{
+            position: 'absolute', top: 16, left: 16, right: 16, zIndex: 2,
+            background: 'rgba(127,29,29,0.9)', border: '1px solid #fca5a5',
+            color: '#fecaca', padding: '10px 14px', fontSize: 11, letterSpacing: 1
+          }}>
+            {error}
+          </div>
+        )}
+        <Suspense fallback={
+          <div style={{
+            height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'rgba(255,255,255,0.5)', fontFamily: bp.font, fontSize: 11, letterSpacing: 3
+          }}>
+            {loading ? 'LOADING GRAPH...' : 'LOADING CANVAS...'}
+          </div>
+        }>
+          <GraphCanvas graph={graph} mode="brainstorm" onNodeClick={setSelected} />
+        </Suspense>
       </div>
 
       {/* Side panel */}

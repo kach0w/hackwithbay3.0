@@ -11,6 +11,23 @@
       "indexes": {
         "graph_events_created_at_idx": { "columns": ["created_at"] }
       }
+    },
+    "app_config": {
+      "columns": {
+        "key": { "type": "text", "primaryKey": true, "nullable": false },
+        "value": { "type": "text", "nullable": false },
+        "updated_at": { "type": "timestamptz", "nullable": false, "default": "now()" }
+      }
+    },
+    "api_endpoints": {
+      "columns": {
+        "id": { "type": "uuid", "primaryKey": true, "nullable": false, "default": "gen_random_uuid()" },
+        "url": { "type": "text", "nullable": false },
+        "created_at": { "type": "timestamptz", "nullable": false, "default": "now()" }
+      },
+      "indexes": {
+        "api_endpoints_created_at_idx": { "columns": ["created_at"] }
+      }
     }
   }
 }

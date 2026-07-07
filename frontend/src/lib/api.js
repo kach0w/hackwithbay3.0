@@ -1,22 +1,6 @@
-const BUILD_TIME_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+import { getApiBase, initApiBase } from './api-config.js'
 
-/** Deployed frontend needs a public backend URL. Override via ?api=https://your-tunnel without redeploying. */
-export function getApiBase() {
-  if (typeof window === 'undefined') return BUILD_TIME_BASE
-
-  const params = new URLSearchParams(window.location.search)
-  const fromQuery = params.get('api')
-  if (fromQuery) {
-    const url = fromQuery.replace(/\/$/, '')
-    sessionStorage.setItem('hivemind_api_url', url)
-    return url
-  }
-
-  const stored = sessionStorage.getItem('hivemind_api_url')
-  if (stored) return stored
-
-  return BUILD_TIME_BASE
-}
+export { getApiBase, initApiBase, setApiBase } from './api-config.js'
 
 async function parseJson(res) {
   const text = await res.text()
@@ -26,8 +10,8 @@ async function parseJson(res) {
   } catch {
     if (text.trimStart().startsWith('<')) {
       throw new Error(
-        'Backend returned HTML instead of JSON — the API tunnel is down or the URL is wrong. ' +
-        'Host: restart `npx localtunnel --port 3001`, then open the app with `?api=<tunnel-url>` on the link you share.'
+        'Backend returned HTML instead of JSON. The API URL is wrong or the tunnel is down. ' +
+        'Host: run `npm run publish:api-url <tunnel-url>` after starting the backend tunnel.'
       )
     }
     throw new Error(`Invalid backend response: ${text.slice(0, 120)}`)
@@ -35,15 +19,14 @@ async function parseJson(res) {
 }
 
 async function apiFetch(path, options) {
+  await initApiBase()
   const base = getApiBase()
   let res
   try {
     res = await fetch(`${base}${path}`, options)
   } catch {
     throw new Error(
-      base.includes('localhost')
-        ? 'Cannot reach the Hivemind backend. Run `cd backend && npm run dev` on port 3001.'
-        : `Cannot reach backend at ${base}. Host must run the backend + tunnel, or add ?api=<tunnel-url> to the link.`
+      `Cannot reach backend at ${base}. Host must run backend + tunnel, then publish the URL.`
     )
   }
   return res

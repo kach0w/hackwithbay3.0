@@ -49,7 +49,16 @@ function wrapLines(ctx, text, maxWidth, maxLines = 2) {
   return lines.length ? lines : [String(text).toUpperCase()]
 }
 
-// Column-per-person layout for brainstorm; structured grid for project
+function boxEdge(node, towardX, towardY) {
+  const hw = (node.__w || 130) / 2
+  const hh = (node.__h || 36) / 2
+  const dx = towardX - node.x
+  const dy = towardY - node.y
+  if (!dx && !dy) return { x: node.x, y: node.y }
+  const scale = Math.min(hw / Math.abs(dx || 1e-9), hh / Math.abs(dy || 1e-9))
+  return { x: node.x + dx * scale, y: node.y + dy * scale }
+}
+
 function computePositions(nodes, edges, W, H, mode) {
   const pos = {}
   if (!W || !H || !nodes.length) return pos
@@ -230,21 +239,17 @@ export default function GraphCanvas({ graph, highlightIds = [], mode = 'brainsto
 
     ctx.fillStyle   = isDeprecated ? 'rgba(255,255,255,0.02)' : colors.fill
     ctx.fillRect(x, y, sw, sh)
-    ctx.strokeStyle = isDeprecated ? DEPRECATED_COLOR : isHighlighted ? '#ffe066' : colors.stroke
-    ctx.lineWidth   = isHighlighted ? lw * 2.5 : lw
-    ctx.setLineDash(isDeprecated ? [3 / gs, 3 / gs] : [])
-    ctx.strokeRect(x, y, sw, sh)
-    ctx.setLineDash([])
+    if (isDeprecated) {
+      ctx.strokeStyle = DEPRECATED_COLOR
+      ctx.lineWidth   = lw
+      ctx.setLineDash([3 / gs, 3 / gs])
+      ctx.strokeRect(x, y, sw, sh)
+      ctx.setLineDash([])
+    }
 
     const sfs = Math.max(6, 8 / gs)
     const fs  = Math.max(8, isPerson ? 12 / gs : 10 / gs)
     const innerW = sw - 16 / gs
-
-    ctx.font      = `${sfs}px 'Courier New', monospace`
-    ctx.fillStyle = 'rgba(255,255,255,0.38)'
-    ctx.textAlign = 'left'
-    ctx.textBaseline = 'top'
-    ctx.fillText(type.toUpperCase(), x + 6 / gs, y + 5 / gs)
 
     ctx.font         = `bold ${fs}px 'Courier New', monospace`
     ctx.fillStyle    = isDeprecated ? DEPRECATED_COLOR : isHighlighted ? '#ffe066' : colors.stroke
@@ -279,10 +284,8 @@ export default function GraphCanvas({ graph, highlightIds = [], mode = 'brainsto
 
     if (isHighlighted) {
       ctx.strokeStyle = '#ffe066'
-      ctx.lineWidth   = lw
-      ctx.setLineDash([4 / gs, 4 / gs])
-      ctx.strokeRect(x - 6 / gs, y - 6 / gs, sw + 12 / gs, sh + 12 / gs)
-      ctx.setLineDash([])
+      ctx.lineWidth   = lw * 2
+      ctx.strokeRect(x - 2 / gs, y - 2 / gs, sw + 4 / gs, sh + 4 / gs)
     }
 
     node.__w = sw; node.__h = sh
@@ -296,32 +299,24 @@ export default function GraphCanvas({ graph, highlightIds = [], mode = 'brainsto
     const isSupersedes = link.type === 'SUPERSEDES'
     const isOverlap    = link.type === 'OVERLAPS_WITH'
 
+    const from = boxEdge(src, tgt.x, tgt.y)
+    const to   = boxEdge(tgt, src.x, src.y)
+
     ctx.strokeStyle = isDeprecated  ? 'rgba(255,255,255,0.12)'
       : isSupersedes ? 'rgba(255,160,80,0.85)'
       : isOverlap    ? 'rgba(253,230,138,0.75)'
-      : 'rgba(255,255,255,0.42)'
+      : 'rgba(255,255,255,0.28)'
     ctx.lineWidth = isOverlap ? 1.5 : 1
     ctx.setLineDash(isDeprecated ? [5, 5] : isSupersedes ? [4, 4] : [])
 
-    const midX = (src.x + tgt.x) / 2
+    const midX = (from.x + to.x) / 2
     ctx.beginPath()
-    ctx.moveTo(src.x, src.y)
-    ctx.lineTo(midX, src.y)
-    ctx.lineTo(midX, tgt.y)
-    ctx.lineTo(tgt.x, tgt.y)
+    ctx.moveTo(from.x, from.y)
+    ctx.lineTo(midX, from.y)
+    ctx.lineTo(midX, to.y)
+    ctx.lineTo(to.x, to.y)
     ctx.stroke()
     ctx.setLineDash([])
-
-    const dy    = tgt.y - src.y
-    const angle = dy === 0 ? Math.atan2(0, tgt.x - src.x) : Math.atan2(dy, 0)
-    const as    = 5
-    ctx.fillStyle = ctx.strokeStyle
-    ctx.beginPath()
-    ctx.moveTo(tgt.x, tgt.y)
-    ctx.lineTo(tgt.x - as * Math.cos(angle - 0.4), tgt.y - as * Math.sin(angle - 0.4))
-    ctx.lineTo(tgt.x - as * Math.cos(angle + 0.4), tgt.y - as * Math.sin(angle + 0.4))
-    ctx.closePath()
-    ctx.fill()
   }, [])
 
   const nodePointerAreaPaint = useCallback((node, color, ctx) => {
@@ -330,7 +325,7 @@ export default function GraphCanvas({ graph, highlightIds = [], mode = 'brainsto
   }, [])
 
   return (
-    <div ref={containerRef} style={{ position: 'relative', width: '100%', height: '100%' }}>
+    <div ref={containerRef} style={{ position: 'relative', width: '100%', height: '100%', minHeight: 320 }}>
       <canvas ref={bgRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} />
       <ForceGraph2D
         ref={fgRef}

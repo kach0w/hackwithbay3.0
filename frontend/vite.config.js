@@ -5,6 +5,9 @@ import { nodePolyfills } from 'vite-plugin-node-polyfills'
 export default defineConfig({
   plugins: [
     react(),
-    nodePolyfills({ include: ['crypto'] }),
+    nodePolyfills({
+      include: ['buffer', 'process', 'stream', 'util', 'crypto', 'vm'],
+      globals: { Buffer: true, global: true, process: true },
+    }),
   ],
 })

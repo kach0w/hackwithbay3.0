@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { createSession } from '../lib/api'
+import { getApiBase, setApiBase } from '../lib/api-config'
 import { butterbase, butterbaseConfigured } from '../lib/butterbase'
 import { getCurrentUser, signInOrUp } from '../lib/auth'
 import { billingConfigured, hasTeamPass, startTeamPassCheckout } from '../lib/billing'
@@ -44,9 +45,16 @@ export default function Landing({ onSession }) {
   const [authErr,  setAuthErr]  = useState('')
   const [loading,  setLoading]  = useState(false)
   const [unlocked, setUnlocked] = useState(!billingConfigured())
-  const [authReady, setAuthReady] = useState(!butterbaseConfigured)
+  const [authReady, setAuthReady] = useState(true)
   const [passChecked, setPassChecked] = useState(!billingConfigured())
   const [payErr,   setPayErr]   = useState('')
+  const [backendUrl, setBackendUrl] = useState('')
+  const [apiStatus, setApiStatus] = useState('')
+
+  useEffect(() => {
+    setBackendUrl(getApiBase())
+    setApiStatus(getApiBase() ? `API: ${getApiBase()}` : '')
+  }, [])
 
   async function refreshTeamPass() {
     if (!billingConfigured()) {
@@ -134,6 +142,20 @@ export default function Landing({ onSession }) {
       await startTeamPassCheckout()
     } catch (err) {
       setPayErr(err.message)
+      setLoading(false)
+    }
+  }
+
+  async function handleSaveBackend(e) {
+    e.preventDefault()
+    setPayErr('')
+    setLoading(true)
+    try {
+      const url = await setApiBase(backendUrl)
+      setApiStatus(`API: ${url}`)
+    } catch (err) {
+      setPayErr(err.message)
+    } finally {
       setLoading(false)
     }
   }
@@ -229,6 +251,29 @@ export default function Landing({ onSession }) {
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, width: 300 }}>
+          <div style={S.panel}>
+            <span style={S.label}>BACKEND URL (HOST)</span>
+            <div style={{ fontSize: 9, color: bp.muted, letterSpacing: 1, marginBottom: 10, lineHeight: 1.45 }}>
+              Deployed app loads this from Butterbase automatically. Paste tunnel URL here if needed.
+            </div>
+            {apiStatus && (
+              <div style={{ fontSize: 9, color: '#86efac', letterSpacing: 1, marginBottom: 10, wordBreak: 'break-all' }}>
+                {apiStatus}
+              </div>
+            )}
+            <form onSubmit={handleSaveBackend} style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+              <input
+                value={backendUrl}
+                onChange={e => setBackendUrl(e.target.value)}
+                placeholder="https://your-tunnel.loca.lt"
+                style={{ ...S.input, flex: 1, fontSize: 10 }}
+              />
+              <button type="submit" style={{ ...S.btn(false), width: 'auto', padding: '10px 12px', whiteSpace: 'nowrap' }}>
+                SET
+              </button>
+            </form>
+          </div>
+
           <div style={S.panel}>
             <span style={S.label}>NEW SESSION</span>
             {billingConfigured() && (

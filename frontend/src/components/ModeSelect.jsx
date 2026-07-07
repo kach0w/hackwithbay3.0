@@ -22,7 +22,7 @@ export default function ModeSelect({ onSelect }) {
         <ModeCard
           title="BRAINSTORM"
           subtitle="MAP YOUR TEAM"
-          description="Ingest GitHub, LinkedIn, and personal websites. Claude builds a complete profile of each person. Overlaps reveal what you should build."
+          description="Add your GitHub — skills and domains populate the team graph. Overlaps reveal what to build together."
           tag="TEAM GRAPH"
           onClick={() => onSelect('brainstorm')}
         />

@@ -83,12 +83,8 @@ console.log('✓ Insert OK')
 
 console.log('')
 console.log('Butterbase is ready. Next:')
-console.log('  1. Copy anon key into frontend/.env (see frontend/.env.example)')
-if (anonKey) {
-  console.log('  2. Mirror BUTTERBASE_ANON_KEY from backend/.env into frontend/.env')
-} else {
-  console.log('  2. Add BUTTERBASE_ANON_KEY to backend/.env and frontend/.env')
-}
-console.log('  3. cd backend && npm run dev')
+console.log('  1. cd backend && npm run dev')
+console.log('  2. Start tunnel: npx localtunnel --port 3001')
+console.log('  3. npm run publish:api-url -- https://your-tunnel.loca.lt')
 console.log('  4. cd frontend && npm run dev')
-console.log('  5. curl http://localhost:3001/health  →  butterbase.ok should be true')
+console.log('     frontend/.env needs VITE_BUTTERBASE_APP_ID (see frontend/.env.example)')

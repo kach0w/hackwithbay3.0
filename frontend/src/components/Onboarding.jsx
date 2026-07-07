@@ -10,8 +10,8 @@ const bp = {
   input: 'rgba(255,255,255,0.08)'
 }
 
-const Field = ({ label, value, onChange, placeholder, optional, hint, type = 'text', minLength }) => (
-  <div style={{ marginBottom: 18 }}>
+const Field = ({ label, value, onChange, placeholder, optional, type = 'text', minLength }) => (
+  <div style={{ marginBottom: 16 }}>
     <div style={{ fontSize: 10, color: bp.muted, letterSpacing: 3, marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
       <span>{label}</span>
       {optional && <span style={{ opacity: 0.4 }}>OPTIONAL</span>}
@@ -29,7 +29,6 @@ const Field = ({ label, value, onChange, placeholder, optional, hint, type = 'te
         fontSize: 13, padding: '10px 12px', outline: 'none'
       }}
     />
-    {hint && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 3 }}>{hint}</div>}
   </div>
 )
 
@@ -38,13 +37,7 @@ export default function Onboarding({ sessionId, shareUrl, onJoined }) {
   const [authMode, setAuthMode] = useState('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [form, setForm] = useState({
-    name:      'Karthik Sabhanayakam',
-    github:    'kach0w',
-    linkedin:  'linkedin.com/in/karsab',
-    website:   'kach0w.github.io',
-    interests: ''
-  })
+  const [form, setForm] = useState({ name: '', github: '', linkedin: '' })
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
@@ -88,26 +81,26 @@ export default function Onboarding({ sessionId, shareUrl, onJoined }) {
 
     setLoading(true)
     setError('')
-    setStatus(needsAuth ? 'SIGNING IN...' : 'BUILDING PROFILE...')
+    setStatus(needsAuth ? 'SIGNING IN...' : 'JOINING...')
 
     try {
       const userId = await resolveUserId()
       setStatus('BUILDING PROFILE...')
-      const result = await joinSession(sessionId, { userId, ...form })
-
-      const member = {
-        name: form.name,
+      const result = await joinSession(sessionId, {
         userId,
-        personId: result.personId
-      }
-      saveMember(sessionId, member)
+        name: form.name.trim(),
+        github: form.github.trim(),
+        linkedin: form.linkedin.trim()
+      })
 
-      if (result.alreadyJoined) {
-        setStatus('WELCOME BACK')
-      } else {
-        setStatus(`PROFILE COMPLETE · ${result.skills?.length || 0} SKILLS · ${result.domains?.length || 0} DOMAINS`)
+      if (result.githubError) {
+        setError(`GitHub: ${result.githubError} — joined with other data`)
       }
-      setTimeout(() => onJoined(member), 600)
+
+      const member = { name: form.name.trim(), userId, personId: result.personId }
+      saveMember(sessionId, member)
+      if (!result.githubError) onJoined(member)
+      else setTimeout(() => onJoined(member), 1500)
     } catch (err) {
       setError(err.message)
       setStatus('')
@@ -124,25 +117,22 @@ export default function Onboarding({ sessionId, shareUrl, onJoined }) {
   return (
     <div style={{
       height: '100vh', background: bp.bg, display: 'flex',
-      alignItems: 'center', justifyContent: 'center', fontFamily: bp.font,
-      backgroundImage: 'repeating-linear-gradient(0deg,rgba(255,255,255,0.04) 0,rgba(255,255,255,0.04) 1px,transparent 1px,transparent 24px),repeating-linear-gradient(90deg,rgba(255,255,255,0.04) 0,rgba(255,255,255,0.04) 1px,transparent 1px,transparent 24px)'
+      alignItems: 'center', justifyContent: 'center', fontFamily: bp.font
     }}>
-      <div style={{ width: 460, maxHeight: '100vh', overflowY: 'auto', padding: '24px 0' }}>
-        <div style={{ marginBottom: 28 }}>
+      <div style={{ width: 400, maxHeight: '100vh', overflowY: 'auto', padding: '24px 0' }}>
+        <div style={{ marginBottom: 24 }}>
           <div style={{ fontSize: 10, color: bp.muted, letterSpacing: 4 }}>HIVEMIND / {sessionId}</div>
           <div style={{ fontSize: 22, letterSpacing: 4, fontWeight: 700, color: bp.text, marginTop: 6 }}>
-            {needsAuth ? 'JOIN HIVEMIND' : 'BUILD YOUR PROFILE'}
+            {needsAuth ? 'JOIN HIVEMIND' : 'YOUR PROFILE'}
           </div>
           <div style={{ fontSize: 10, color: bp.muted, letterSpacing: 1, marginTop: 4 }}>
-            {needsAuth
-              ? 'Sign in and fill your profile — Claude builds your builder graph from your links.'
-              : 'Claude will scrape your data and form a complete picture of who you are as a builder.'}
+            Name, GitHub, and optional LinkedIn.
           </div>
         </div>
 
         {shareUrl && (
-          <div style={{ border: `1px solid ${bp.border}`, padding: '10px 14px', marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 10, color: bp.muted, letterSpacing: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 340 }}>
+          <div style={{ border: `1px solid ${bp.border}`, padding: '10px 14px', marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 10, color: bp.muted, letterSpacing: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 280 }}>
               {shareUrl}
             </span>
             <button type="button" onClick={copyLink} style={{ background: 'transparent', color: copied ? '#ffe066' : bp.muted, border: 'none', fontFamily: bp.font, fontSize: 10, letterSpacing: 2, cursor: 'pointer', whiteSpace: 'nowrap', marginLeft: 8 }}>
@@ -152,7 +142,7 @@ export default function Onboarding({ sessionId, shareUrl, onJoined }) {
         )}
 
         {authUser && (
-          <div style={{ fontSize: 10, color: '#86efac', letterSpacing: 2, marginBottom: 20 }}>
+          <div style={{ fontSize: 10, color: '#86efac', letterSpacing: 2, marginBottom: 16 }}>
             SIGNED IN AS {authUser.email}
           </div>
         )}
@@ -160,7 +150,6 @@ export default function Onboarding({ sessionId, shareUrl, onJoined }) {
         <form onSubmit={handleSubmit}>
           {needsAuth && (
             <>
-              <div style={{ fontSize: 10, color: bp.muted, letterSpacing: 3, marginBottom: 12 }}>ACCOUNT</div>
               <Field label="EMAIL" value={email} onChange={setEmail} placeholder="you@email.com" type="email" />
               <Field
                 label="PASSWORD"
@@ -169,33 +158,20 @@ export default function Onboarding({ sessionId, shareUrl, onJoined }) {
                 placeholder="••••••••"
                 type="password"
                 minLength={8}
-                hint={authMode === 'signup' ? '8+ chars with upper, lower, number, and special character' : undefined}
               />
               <button
                 type="button"
                 onClick={() => { setAuthMode(authMode === 'signin' ? 'signup' : 'signin'); setError('') }}
-                style={{ background: 'transparent', border: 'none', color: bp.muted, fontFamily: bp.font, fontSize: 10, letterSpacing: 2, cursor: 'pointer', marginBottom: 24, padding: 0 }}
+                style={{ background: 'transparent', border: 'none', color: bp.muted, fontFamily: bp.font, fontSize: 10, letterSpacing: 2, cursor: 'pointer', marginBottom: 20, padding: 0 }}
               >
                 {authMode === 'signin' ? 'NEED AN ACCOUNT? SIGN UP' : 'ALREADY HAVE AN ACCOUNT? SIGN IN'}
               </button>
             </>
           )}
 
-          <div style={{ fontSize: 10, color: bp.muted, letterSpacing: 3, marginBottom: 12 }}>PROFILE</div>
           <Field label="NAME" value={form.name} onChange={set('name')} placeholder="Your name" />
-          <Field label="GITHUB USERNAME" value={form.github} onChange={set('github')} placeholder="kach0w" optional hint="Repos + stars scraped for skills and domains" />
-          <Field label="LINKEDIN" value={form.linkedin} onChange={set('linkedin')} placeholder="linkedin.com/in/username" optional hint="Roles, companies, industries" />
-          <Field label="PERSONAL WEBSITE" value={form.website} onChange={set('website')} placeholder="yoursite.com" optional hint="Writing topics and what you think about" />
-          <div style={{ marginBottom: 24 }}>
-            <div style={{ fontSize: 10, color: bp.muted, letterSpacing: 3, marginBottom: 4 }}>INTERESTS & CURIOSITIES <span style={{ opacity: 0.4 }}>OPTIONAL</span></div>
-            <textarea
-              value={form.interests}
-              onChange={e => setForm(f => ({ ...f, interests: e.target.value }))}
-              placeholder="What are you most curious about? What problem do you hate? What would you build with 6 months?"
-              rows={3}
-              style={{ width: '100%', background: bp.input, color: bp.text, border: `1px solid ${bp.border}`, fontFamily: bp.font, fontSize: 13, padding: '10px 12px', outline: 'none', resize: 'none' }}
-            />
-          </div>
+          <Field label="GITHUB USERNAME" value={form.github} onChange={set('github')} placeholder="kach0w or github.com/you" />
+          <Field label="LINKEDIN" value={form.linkedin} onChange={set('linkedin')} placeholder="linkedin.com/in/you" optional />
 
           {error && (
             <div style={{ fontSize: 11, color: '#fca5a5', marginBottom: 12, letterSpacing: 1 }}>{error}</div>

@@ -3,8 +3,9 @@ import { butterbase, butterbaseConfigured } from './butterbase'
 export async function getCurrentUser() {
   if (!butterbaseConfigured || !butterbase) return null
   const { data, error } = await butterbase.auth.getUser()
-  if (error || !data?.id) return null
-  return data
+  if (error) return null
+  const user = data?.user ?? data
+  return user?.id ? user : null
 }
 
 export async function signInOrUp({ email, password, mode }) {
