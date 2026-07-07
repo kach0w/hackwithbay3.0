@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "node --watch index.js",
     "setup:butterbase": "node scripts/setup-butterbase.mjs",
+    "setup:billing": "node scripts/setup-billing.mjs",
     "seed": "node scripts/seed-session.mjs",
     "check": "node test/live-check.mjs"
   },

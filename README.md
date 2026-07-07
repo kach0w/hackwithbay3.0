@@ -55,11 +55,14 @@ Choose mode on entry:
    cp backend/.env.example backend/.env
    cp frontend/.env.example frontend/.env
    ```
-4. Bootstrap schema:
+4. Bootstrap schema + payments:
    ```bash
    cd backend && npm install && npm run setup:butterbase
+   npm run setup:billing   # Stripe Connect + Team Pass product
    ```
 5. Verify: `curl http://localhost:3001/health` → `butterbase.ok: true` and `rocketride` status
+
+**Payments flow:** Session creators unlock a **Hivemind Team Pass** ($1, Stripe Checkout via Butterbase Payments) before creating a hivemind. Teammates join free via the shared link.
 
 ### RocketRide (Person D — see [rocketride/README.md](./rocketride/README.md))
 
@@ -111,7 +114,7 @@ npm run dev
 ## Sponsor Story
 
 - **Neo4j** — the session-scoped graph powers both tabs: skill/domain traversal on the brainstorm side, and temporal `SUPERSEDES` edges + multi-hop dependency inference on the project side. Everything that's hard or impossible in a flat DB.
-- **Butterbase** — auth gates the app; inserts into `graph_events` on every write so all open browsers refetch instantly. The two-laptop join moment is Butterbase.
+- **Butterbase** — auth gates the app; inserts into `graph_events` on every write so all open browsers refetch instantly. The two-laptop join moment is Butterbase. **Payments:** Team Pass checkout via Butterbase Payments (Stripe Connect).
 - **RocketRide** — decision extraction pipeline: freeform utterance → structured `{ intent, component, tech }` → correct Neo4j operation.
 
 ---

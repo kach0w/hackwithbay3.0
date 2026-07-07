@@ -52,7 +52,18 @@ function shapeNode(n) {
     conversation_topics: p.conversation_topics || [],
     intersection: p.intersection || null,
     build_direction: p.build_direction || null,
-    strength: p.strength ?? null
+    strength: p.strength ?? null,
+    butterbase_user_id: p.butterbase_user_id || null
+  }
+}
+
+function membersOnly(graph) {
+  const isMember = n => n.type !== 'Person' || Boolean(n.butterbase_user_id)
+  const nodes = graph.nodes.filter(isMember)
+  const ids = new Set(nodes.map(n => n.id))
+  return {
+    nodes,
+    edges: graph.edges.filter(e => ids.has(e.source) && ids.has(e.target))
   }
 }
 
@@ -100,7 +111,7 @@ export async function fetchBrainstormGraph(sessionId) {
     WHERE m:Person OR m:Skill OR m:Domain OR m:Overlap
     RETURN n, r, m
   `, { sessionId })
-  return buildGraph(records)
+  return membersOnly(buildGraph(records))
 }
 
 export async function fetchProjectGraph(sessionId) {
@@ -111,7 +122,7 @@ export async function fetchProjectGraph(sessionId) {
     WHERE (m)-[:IN_SESSION]->(s) AND (m:Person OR m:Component OR m:Decision)
     RETURN n, r, m
   `, { sessionId })
-  return buildGraph(records)
+  return membersOnly(buildGraph(records))
 }
 
 export async function getPersonByUserId(sessionId, userId) {
@@ -243,24 +254,9 @@ export async function seedProjectSession(sessionId) {
 
   await run(`
     MATCH (s:Session {id: $sessionId})
-    UNWIND [['person_shreeya','Shreeya'],['person_frank','Frank'],
-            ['person_ryan','Ryan'],['person_priya','Priya']] AS pr
-    MERGE (p:Person {id: pr[0]}) SET p.name = pr[1], p.label = pr[1]
-    MERGE (p)-[:IN_SESSION]->(s)
-  `, { sessionId })
-
-  await run(`
-    MATCH (s:Session {id: $sessionId})
     UNWIND ['frontend','auth-service','user-service','matching-engine','payments','notifications'] AS cn
     MERGE (c:Component {id: 'comp_' + cn}) SET c.name = cn, c.label = cn
     MERGE (c)-[:IN_SESSION]->(s)
-  `, { sessionId })
-
-  await run(`
-    UNWIND [['person_shreeya','comp_user-service'],['person_frank','comp_auth-service'],
-            ['person_ryan','comp_matching-engine'],['person_priya','comp_payments']] AS o
-    MATCH (p:Person {id: o[0]}), (c:Component {id: o[1]})
-    MERGE (p)-[:OWNS]->(c)
   `, { sessionId })
 
   await run(`
@@ -273,14 +269,13 @@ export async function seedProjectSession(sessionId) {
 
   await run(`
     MATCH (s:Session {id: $sessionId})
-    MATCH (c:Component {id: 'comp_user-service'}), (p:Person {id: 'person_shreeya'})
+    MATCH (c:Component {id: 'comp_user-service'})
     MERGE (d:Decision {id: 'd_pg'})
       ON CREATE SET d.text = 'Use Postgres for user-service',
                     d.label = 'Use Postgres for user-service',
                     d.ts = datetime() - duration('PT2H'), d.deprecated = false
     MERGE (d)-[:IN_SESSION]->(s)
     MERGE (d)-[:ABOUT]->(c)
-    MERGE (p)-[:MADE]->(d)
   `, { sessionId })
 }
 

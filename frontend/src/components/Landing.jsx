@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { createSession } from '../lib/api'
 import { butterbase, butterbaseConfigured } from '../lib/butterbase'
 import { getCurrentUser, signInOrUp } from '../lib/auth'
+import { billingConfigured, hasTeamPass, startTeamPassCheckout } from '../lib/billing'
 
 const bp = {
   bg: '#1464b4', border: 'rgba(255,255,255,0.3)',
@@ -42,12 +43,28 @@ export default function Landing({ onSession }) {
   const [authUser, setAuthUser] = useState(null)
   const [authErr,  setAuthErr]  = useState('')
   const [loading,  setLoading]  = useState(false)
+  const [unlocked, setUnlocked] = useState(!billingConfigured())
+  const [payErr,   setPayErr]   = useState('')
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('purchase') === 'success') {
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [])
 
   useEffect(() => {
     if (!butterbaseConfigured) return
-    getCurrentUser().then(user => {
+    getCurrentUser().then(async user => {
       setAuthUser(user)
       if (user?.email) setEmail(user.email)
+      if (user && billingConfigured()) {
+        try {
+          setUnlocked(await hasTeamPass())
+        } catch {
+          setUnlocked(false)
+        }
+      }
     })
     if (!butterbase) return
     const { unsubscribe } = butterbase.onAuthStateChange((_event, session) => {
@@ -55,6 +72,11 @@ export default function Landing({ onSession }) {
     })
     return unsubscribe
   }, [])
+
+  useEffect(() => {
+    if (!authUser || !billingConfigured()) return
+    hasTeamPass().then(setUnlocked).catch(() => setUnlocked(false))
+  }, [authUser])
 
   async function handleAuth(e) {
     e.preventDefault()
@@ -74,9 +96,33 @@ export default function Landing({ onSession }) {
   async function handleSignOut() {
     if (butterbase) await butterbase.auth.signOut()
     setAuthUser(null)
+    setUnlocked(!billingConfigured())
+  }
+
+  async function handleUnlock() {
+    if (!authUser) {
+      setPayErr('Sign in first to purchase a Team Pass')
+      return
+    }
+    setPayErr('')
+    setLoading(true)
+    try {
+      await startTeamPassCheckout()
+    } catch (err) {
+      setPayErr(err.message)
+      setLoading(false)
+    }
   }
 
   async function handleCreate() {
+    if (billingConfigured() && !authUser) {
+      setPayErr('Sign in to create a hivemind')
+      return
+    }
+    if (billingConfigured() && !unlocked) {
+      await handleUnlock()
+      return
+    }
     setLoading(true)
     try {
       const { sessionId } = await createSession()
@@ -90,6 +136,8 @@ export default function Landing({ onSession }) {
     e.preventDefault()
     if (joinId.trim()) onSession(joinId.trim(), null)
   }
+
+  const needsUnlock = billingConfigured() && authUser && !unlocked
 
   return (
     <div style={{ height: '100vh', background: bp.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: bp.font, color: bp.text }}>
@@ -150,13 +198,30 @@ export default function Landing({ onSession }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, width: 300 }}>
           <div style={S.panel}>
             <span style={S.label}>NEW SESSION</span>
-            <button onClick={handleCreate} disabled={loading} style={S.btn(true)}>
-              {loading ? 'CREATING...' : 'CREATE HIVEMIND'}
-            </button>
+            {billingConfigured() && (
+              <div style={{ fontSize: 9, color: bp.muted, letterSpacing: 1, marginBottom: 12, lineHeight: 1.5 }}>
+                {unlocked
+                  ? 'Team Pass active — create a hivemind for your crew.'
+                  : 'Unlock via Butterbase Payments (Stripe Checkout) — $1 one-time Team Pass.'}
+              </div>
+            )}
+            {payErr && <div style={{ fontSize: 10, color: '#fca5a5', marginBottom: 10, letterSpacing: 1 }}>{payErr}</div>}
+            {needsUnlock ? (
+              <button onClick={handleUnlock} disabled={loading} style={S.btn(true)}>
+                {loading ? 'REDIRECTING...' : 'UNLOCK TEAM PASS — $1'}
+              </button>
+            ) : (
+              <button onClick={handleCreate} disabled={loading} style={S.btn(true)}>
+                {loading ? 'CREATING...' : 'CREATE HIVEMIND'}
+              </button>
+            )}
           </div>
 
           <div style={S.panel}>
             <span style={S.label}>JOIN EXISTING</span>
+            <div style={{ fontSize: 9, color: bp.muted, letterSpacing: 1, marginBottom: 10 }}>
+              Teammates join free with the shared link.
+            </div>
             <form onSubmit={handleJoin} style={{ display: 'flex', gap: 8 }}>
               <input
                 value={joinId}

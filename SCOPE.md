@@ -14,7 +14,6 @@
 | Neo4j graph layer | **Shreeya (A)** | ✅ Merged | Session scope, seeds, supersede, inferAffected |
 | Frontend UI | **Person C** | ✅ Mostly done | Landing auth, onboarding, brainstorm + project tabs |
 | RocketRide pipeline | **Person D** | 🟡 Wire ready | `.pipe` + SDK in repo; **needs cloud deploy + env keys** |
-| Butterbase payments | **Karthik (B)** | ❌ Not started | Mandatory for judging |
 | Public backend URL | **Host** | ❌ Not started | Deployed frontend still points at `localhost:3001` |
 | Hackathon submission | **Karthik (B)** | ❌ Not started | Promo `ENJOY0707`, slug `HackwithBay-0707` |
 
@@ -26,13 +25,12 @@
 
 **Done:** Auth, realtime, person IDs, frontend deploy, merge Person A work.
 
-**Remaining (~2–3 hrs):**
+**Remaining (~1–2 hrs):**
 
-1. **Butterbase payments** — add a minimal paywall or team upgrade flow (Stripe Connect via Butterbase billing). Even a $0 test checkout counts as "in active use."
-2. **Share secrets** with host (Discord, not git): Butterbase keys, Neo4j creds if coordinating.
-3. **Set `VITE_API_URL`** on frontend deploy to host's public backend URL; redeploy `hivemind.butterbase.dev`.
-4. **Submit** to hackathon via Butterbase agent prompt when demo is stable.
-5. **Optional:** Add `session_id` column to `graph_events` schema for cleaner realtime filtering.
+1. **Share secrets** with host (Discord, not git): Butterbase keys, Neo4j creds if coordinating.
+2. **Set `VITE_API_URL`** on frontend deploy to host's public backend URL; redeploy `hivemind.butterbase.dev`.
+3. **Submit** to hackathon via Butterbase agent prompt when demo is stable.
+4. **Optional:** Add `session_id` column to `graph_events` schema for cleaner realtime filtering.
 
 ---
 
@@ -124,7 +122,7 @@ See [rocketride/README.md](./rocketride/README.md) for full steps.
 
 ## Judging checklist
 
-- [ ] Butterbase: auth in use ✅ · database (`graph_events`) ✅ · **payments** ❌
+- [ ] Butterbase: auth in use ✅ · database (`graph_events`) ✅
 - [ ] Neo4j: session-scoped graph, Cypher traversal, supersede + inference ✅
 - [ ] RocketRide: pipeline deployed to **cloud**, backend calls it in production 🟡
 - [ ] Deep integration: all three in core PROJECT flow, not bolted on

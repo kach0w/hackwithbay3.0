@@ -2,29 +2,54 @@ import React, { useRef, useCallback, useEffect, useMemo, useState } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
 
 const COLORS = {
-  Person:    { stroke: '#ffffff',  fill: 'rgba(255,255,255,0.10)' },
-  Skill:     { stroke: '#7dd3fc', fill: 'rgba(125,211,252,0.08)' },
-  Domain:    { stroke: '#86efac', fill: 'rgba(134,239,172,0.08)' },
-  Overlap:   { stroke: '#fde68a', fill: 'rgba(253,230,138,0.12)' },
-  Component: { stroke: '#c4b5fd', fill: 'rgba(196,181,253,0.08)' },
-  Decision:  { stroke: '#fdba74', fill: 'rgba(253,186,116,0.08)' },
+  Person:    { stroke: '#ffffff',  fill: 'rgba(255,255,255,0.14)' },
+  Skill:     { stroke: '#7dd3fc', fill: 'rgba(125,211,252,0.12)' },
+  Domain:    { stroke: '#86efac', fill: 'rgba(134,239,172,0.12)' },
+  Overlap:   { stroke: '#fde68a', fill: 'rgba(253,230,138,0.16)' },
+  Component: { stroke: '#c4b5fd', fill: 'rgba(196,181,253,0.10)' },
+  Decision:  { stroke: '#fdba74', fill: 'rgba(253,186,116,0.12)' },
 }
 
 const DEPRECATED_COLOR = 'rgba(255,255,255,0.2)'
 
 const NODE_SIZE = {
-  Person:    { w: 164, h: 48 },
-  Overlap:   { w: 184, h: 48 },
-  Decision:  { w: 184, h: 44 },
-  Skill:     { w: 134, h: 36 },
-  Domain:    { w: 144, h: 36 },
-  Component: { w: 154, h: 42 },
+  Person:    { w: 228, h: 76 },
+  Overlap:   { w: 220, h: 56 },
+  Decision:  { w: 200, h: 48 },
+  Skill:     { w: 148, h: 40 },
+  Domain:    { w: 158, h: 40 },
+  Component: { w: 168, h: 44 },
 }
 
-function getSize(type) { return NODE_SIZE[type] || { w: 130, h: 36 } }
+function getSize(type) { return NODE_SIZE[type] || { w: 140, h: 40 } }
 function nid(x) { return x?.id ?? x }
 
-// Deterministic layout — computes fixed (x,y) per node type, no physics needed
+function wrapLines(ctx, text, maxWidth, maxLines = 2) {
+  const words = String(text).toUpperCase().split(/\s+/)
+  const lines = []
+  let line = ''
+  for (const word of words) {
+    const test = line ? `${line} ${word}` : word
+    if (ctx.measureText(test).width > maxWidth && line) {
+      lines.push(line)
+      line = word
+    } else {
+      line = test
+    }
+    if (lines.length >= maxLines) break
+  }
+  if (line && lines.length < maxLines) lines.push(line)
+  if (words.length && lines.length === maxLines) {
+    const last = lines[maxLines - 1]
+    while (ctx.measureText(`${last}…`).width > maxWidth && last.length > 3) {
+      lines[maxLines - 1] = last.slice(0, -1)
+    }
+    if (!lines[maxLines - 1].endsWith('…')) lines[maxLines - 1] += '…'
+  }
+  return lines.length ? lines : [String(text).toUpperCase()]
+}
+
+// Column-per-person layout for brainstorm; structured grid for project
 function computePositions(nodes, edges, W, H, mode) {
   const pos = {}
   if (!W || !H || !nodes.length) return pos
@@ -36,20 +61,12 @@ function computePositions(nodes, edges, W, H, mode) {
   const domains    = byType('Domain')
   const components = byType('Component')
   const decisions  = byType('Decision')
-  const pad = 110
+  const padX = 140
+  const padY = 90
 
   if (mode === 'brainstorm') {
-    const usableW = W - pad * 2
+    const colW = Math.max(240, (W - padX * 2) / Math.max(persons.length, 1))
 
-    // Row 1: Persons evenly across top
-    persons.forEach((p, i) => {
-      pos[p.id] = {
-        x: persons.length === 1 ? W / 2 : pad + (usableW / (persons.length - 1)) * i,
-        y: Math.round(H * 0.16)
-      }
-    })
-
-    // Build owner map: skill/domain id → person id
     const owner = {}
     for (const e of edges) {
       const sid = nid(e.source), tid = nid(e.target)
@@ -60,35 +77,56 @@ function computePositions(nodes, edges, W, H, mode) {
       if (tn.type === 'Person' && (sn.type === 'Skill' || sn.type === 'Domain')) owner[sn.id] = tn.id
     }
 
-    // Row 2: Skills — 3 columns under their person, 62px row gap
-    const skillIdx = {}
+    const skillsByPerson = {}
+    const domainsByPerson = {}
     for (const s of skills) {
-      const pid  = owner[s.id]
-      const pPos = pos[pid]
-      const idx  = skillIdx[pid ?? '_'] ?? 0
-      skillIdx[pid ?? '_'] = idx + 1
-      const col  = (idx % 3) - 1
-      pos[s.id] = {
-        x: pPos ? Math.round(pPos.x + col * 148) : Math.round(pad + ((skills.indexOf(s) + 1) * (usableW / (skills.length + 1)))),
-        y: Math.round(H * 0.40 + Math.floor(idx / 3) * 62)
-      }
+      const pid = owner[s.id] || '_orphan'
+      ;(skillsByPerson[pid] ||= []).push(s)
     }
-
-    // Row 3: Domains — same structure below skills
-    const domIdx = {}
     for (const d of domains) {
-      const pid  = owner[d.id]
-      const pPos = pos[pid]
-      const idx  = domIdx[pid ?? '_'] ?? 0
-      domIdx[pid ?? '_'] = idx + 1
-      const col  = (idx % 3) - 1
-      pos[d.id] = {
-        x: pPos ? Math.round(pPos.x + col * 158) : Math.round(pad + ((domains.indexOf(d) + 1) * (usableW / (domains.length + 1)))),
-        y: Math.round(H * 0.64 + Math.floor(idx / 3) * 58)
-      }
+      const pid = owner[d.id] || '_orphan'
+      ;(domainsByPerson[pid] ||= []).push(d)
     }
 
-    // Row 4: Overlaps — centered between their connected persons
+    persons.forEach((p, i) => {
+      const cx = padX + colW * i + colW / 2
+      pos[p.id] = { x: Math.round(cx), y: Math.round(padY) }
+
+      const pSkills = skillsByPerson[p.id] || []
+      const pDomains = domainsByPerson[p.id] || []
+      const skillCols = 2
+      const rowH = 52
+
+      pSkills.forEach((s, idx) => {
+        const col = idx % skillCols
+        const row = Math.floor(idx / skillCols)
+        pos[s.id] = {
+          x: Math.round(cx + (col - 0.5) * 162),
+          y: Math.round(padY + 100 + row * rowH)
+        }
+      })
+
+      const skillRows = Math.ceil(pSkills.length / skillCols) || 0
+      const domainStartY = padY + 100 + skillRows * rowH + 36
+
+      pDomains.forEach((d, idx) => {
+        const col = idx % skillCols
+        const row = Math.floor(idx / skillCols)
+        pos[d.id] = {
+          x: Math.round(cx + (col - 0.5) * 168),
+          y: Math.round(domainStartY + row * rowH)
+        }
+      })
+    })
+
+  // Orphan skills/domains (no person edge yet)
+    for (const s of skillsByPerson['_orphan'] || []) {
+      if (!pos[s.id]) pos[s.id] = { x: Math.round(W / 2), y: Math.round(H * 0.45) }
+    }
+    for (const d of domainsByPerson['_orphan'] || []) {
+      if (!pos[d.id]) pos[d.id] = { x: Math.round(W / 2), y: Math.round(H * 0.62) }
+    }
+
     for (const o of overlaps) {
       const personIds = edges
         .filter(e => nid(e.source) === o.id || nid(e.target) === o.id)
@@ -97,21 +135,21 @@ function computePositions(nodes, edges, W, H, mode) {
       const pPoses = personIds.map(id => pos[id]).filter(Boolean)
       pos[o.id] = {
         x: Math.round(pPoses.length ? pPoses.reduce((s, p) => s + p.x, 0) / pPoses.length : W / 2),
-        y: Math.round(H * 0.86)
+        y: Math.round(H - padY)
       }
     }
   } else {
-    // Project: persons left | components center | decisions grid right
+    const rowH = Math.max(88, (H - padY * 2) / Math.max(persons.length, components.length, 1))
     persons.forEach((p, i) => {
-      pos[p.id] = { x: pad, y: Math.round(H * 0.18 + i * 92) }
+      pos[p.id] = { x: padX, y: Math.round(padY + i * rowH) }
     })
     components.forEach((c, i) => {
-      pos[c.id] = { x: pad + 220, y: Math.round(H * 0.14 + i * 92) }
+      pos[c.id] = { x: padX + 280, y: Math.round(padY + i * rowH) }
     })
     decisions.forEach((d, i) => {
       pos[d.id] = {
-        x: pad + 450 + (i % 3) * 206,
-        y: Math.round(H * 0.14 + Math.floor(i / 3) * 82)
+        x: padX + 520 + (i % 2) * 220,
+        y: Math.round(padY + Math.floor(i / 2) * 72)
       }
     })
   }
@@ -121,10 +159,10 @@ function computePositions(nodes, edges, W, H, mode) {
 
 export default function GraphCanvas({ graph, highlightIds = [], mode = 'brainstorm', onNodeClick }) {
   const bgRef        = useRef()
+  const fgRef        = useRef()
   const containerRef = useRef()
   const [dims, setDims] = useState({ w: 900, h: 600 })
 
-  // Track container dimensions for layout computation
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
@@ -136,7 +174,6 @@ export default function GraphCanvas({ graph, highlightIds = [], mode = 'brainsto
     return () => ro.disconnect()
   }, [])
 
-  // Blueprint grid background
   useEffect(() => {
     const canvas = bgRef.current
     if (!canvas) return
@@ -157,7 +194,6 @@ export default function GraphCanvas({ graph, highlightIds = [], mode = 'brainsto
     return () => window.removeEventListener('resize', draw)
   }, [])
 
-  // Precompute static positions — nodes get fx/fy so simulation does nothing
   const graphData = useMemo(() => {
     const { w, h } = dims
     const nodes = graph.nodes || []
@@ -172,20 +208,26 @@ export default function GraphCanvas({ graph, highlightIds = [], mode = 'brainsto
     }
   }, [graph, dims, mode])
 
+  useEffect(() => {
+    if (!fgRef.current || !graphData.nodes.length) return
+    const t = setTimeout(() => {
+      fgRef.current.zoomToFit(500, 72)
+    }, 80)
+    return () => clearTimeout(t)
+  }, [graphData, dims.w, dims.h])
+
   const nodeCanvasObject = useCallback((node, ctx, gs) => {
     const isDeprecated  = node.deprecated
     const isHighlighted = highlightIds.includes(node.id)
-    const label  = (node.label || node.id || '').toUpperCase()
+    const label  = node.label || node.id || ''
     const type   = node.type || 'Component'
     const colors = COLORS[type] || COLORS.Component
     const { w, h } = getSize(type)
     const sw = w / gs, sh = h / gs
     const x  = node.x - sw / 2, y = node.y - sh / 2
-    const lw = Math.max(0.5, 1.2 / gs)
-    const fs = Math.max(7, 11 / gs)
-    const sfs = Math.max(5, 7.5 / gs)
+    const lw = Math.max(0.6, 1.4 / gs)
+    const isPerson = type === 'Person'
 
-    // Fill + border
     ctx.fillStyle   = isDeprecated ? 'rgba(255,255,255,0.02)' : colors.fill
     ctx.fillRect(x, y, sw, sh)
     ctx.strokeStyle = isDeprecated ? DEPRECATED_COLOR : isHighlighted ? '#ffe066' : colors.stroke
@@ -194,32 +236,39 @@ export default function GraphCanvas({ graph, highlightIds = [], mode = 'brainsto
     ctx.strokeRect(x, y, sw, sh)
     ctx.setLineDash([])
 
-    // Corner tick marks
-    if (!isDeprecated) {
-      const t = 5 / gs
-      ctx.strokeStyle = 'rgba(255,255,255,0.28)'
-      ctx.lineWidth   = lw * 0.7
-      ;[[x, y], [x + sw, y], [x, y + sh], [x + sw, y + sh]].forEach(([cx, cy]) => {
-        ctx.beginPath(); ctx.moveTo(cx - t, cy); ctx.lineTo(cx + t, cy); ctx.stroke()
-        ctx.beginPath(); ctx.moveTo(cx, cy - t); ctx.lineTo(cx, cy + t); ctx.stroke()
-      })
-    }
+    const sfs = Math.max(6, 8 / gs)
+    const fs  = Math.max(8, isPerson ? 12 / gs : 10 / gs)
+    const innerW = sw - 16 / gs
 
-    // Type tag top-left
-    ctx.font         = `${sfs}px 'Courier New', monospace`
-    ctx.fillStyle    = 'rgba(255,255,255,0.32)'
-    ctx.textAlign    = 'left'
+    ctx.font      = `${sfs}px 'Courier New', monospace`
+    ctx.fillStyle = 'rgba(255,255,255,0.38)'
+    ctx.textAlign = 'left'
     ctx.textBaseline = 'top'
-    ctx.fillText(type.toUpperCase(), x + 4 / gs, y + 3 / gs)
+    ctx.fillText(type.toUpperCase(), x + 6 / gs, y + 5 / gs)
 
-    // Main label centered
     ctx.font         = `bold ${fs}px 'Courier New', monospace`
     ctx.fillStyle    = isDeprecated ? DEPRECATED_COLOR : isHighlighted ? '#ffe066' : colors.stroke
     ctx.textAlign    = 'center'
     ctx.textBaseline = 'middle'
-    const maxChars   = Math.floor(sw / (fs * 0.58))
-    const display    = label.length > maxChars ? label.slice(0, maxChars - 2) + '..' : label
-    ctx.fillText(display, node.x, node.y + 3 / gs)
+
+    if (isPerson) {
+      const lines = wrapLines(ctx, label, innerW, 2)
+      const lineH = fs * 1.25
+      const startY = node.y - ((lines.length - 1) * lineH) / 2 + 4 / gs
+      lines.forEach((line, i) => ctx.fillText(line, node.x, startY + i * lineH))
+      if (node.archetype) {
+        ctx.font = `${sfs}px 'Courier New', monospace`
+        ctx.fillStyle = 'rgba(255,255,255,0.45)'
+        const arch = String(node.archetype).toUpperCase()
+        const archLine = arch.length > 28 ? `${arch.slice(0, 26)}…` : arch
+        ctx.fillText(archLine, node.x, y + sh - 12 / gs)
+      }
+    } else {
+      const lines = wrapLines(ctx, label, innerW, 2)
+      const lineH = fs * 1.2
+      const startY = node.y - ((lines.length - 1) * lineH) / 2 + 2 / gs
+      lines.forEach((line, i) => ctx.fillText(line, node.x, startY + i * lineH))
+    }
 
     if (isDeprecated) {
       ctx.strokeStyle = 'rgba(255,255,255,0.2)'
@@ -232,14 +281,13 @@ export default function GraphCanvas({ graph, highlightIds = [], mode = 'brainsto
       ctx.strokeStyle = '#ffe066'
       ctx.lineWidth   = lw
       ctx.setLineDash([4 / gs, 4 / gs])
-      ctx.strokeRect(x - 5 / gs, y - 5 / gs, sw + 10 / gs, sh + 10 / gs)
+      ctx.strokeRect(x - 6 / gs, y - 6 / gs, sw + 12 / gs, sh + 12 / gs)
       ctx.setLineDash([])
     }
 
     node.__w = sw; node.__h = sh
   }, [highlightIds])
 
-  // Orthogonal L-path edges
   const linkCanvasObject = useCallback((link, ctx) => {
     const src = link.source, tgt = link.target
     if (!src?.x || !tgt?.x) return
@@ -285,6 +333,7 @@ export default function GraphCanvas({ graph, highlightIds = [], mode = 'brainsto
     <div ref={containerRef} style={{ position: 'relative', width: '100%', height: '100%' }}>
       <canvas ref={bgRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} />
       <ForceGraph2D
+        ref={fgRef}
         graphData={graphData}
         width={dims.w}
         height={dims.h}
@@ -298,6 +347,8 @@ export default function GraphCanvas({ graph, highlightIds = [], mode = 'brainsto
         onNodeClick={onNodeClick}
         enableNodeDrag={false}
         enableZoomInteraction={true}
+        minZoom={0.35}
+        maxZoom={2.5}
         d3AlphaDecay={1}
         cooldownTicks={0}
       />
@@ -324,6 +375,7 @@ function Legend({ mode }) {
           <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', letterSpacing: 1 }}>{label}</span>
         </div>
       ))}
+      <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', letterSpacing: 1, marginTop: 6 }}>SCROLL TO ZOOM</div>
     </div>
   )
 }
