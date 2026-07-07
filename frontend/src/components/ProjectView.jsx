@@ -19,7 +19,8 @@ export default function ProjectView({ sessionId, author }) {
   function handleResult(result) {
     load()
     if (result.affected?.length > 0) {
-      const ids = result.affected.flatMap(a => [a.notify, ...a.affected])
+      // highlight by node id (person_/comp_), not display name — see inferAffected
+      const ids = result.affected.flatMap(a => [a.notifyId, ...a.affectedIds])
       setHighlightIds(ids)
       setTimeout(() => setHighlightIds([]), 4000)
     }
