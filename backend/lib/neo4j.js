@@ -1,13 +1,21 @@
 import neo4j from 'neo4j-driver'
 import { flattenGraph } from './graph-shape.js'
 
+// Accept either NEO4J_USER or the NEO4J_USERNAME field name that Aura's
+// downloaded credentials file uses, so pasting that file into .env just works.
 const driver = neo4j.driver(
   process.env.NEO4J_URI,
-  neo4j.auth.basic(process.env.NEO4J_USER, process.env.NEO4J_PASSWORD)
+  neo4j.auth.basic(
+    process.env.NEO4J_USER || process.env.NEO4J_USERNAME,
+    process.env.NEO4J_PASSWORD
+  )
 )
 
+// Aura's file also names the database (often not "neo4j"); honor it if present.
+const DATABASE = process.env.NEO4J_DATABASE || undefined
+
 async function run(cypher, params = {}) {
-  const session = driver.session()
+  const session = driver.session(DATABASE ? { database: DATABASE } : undefined)
   try {
     const result = await session.run(cypher, params)
     return result.records
