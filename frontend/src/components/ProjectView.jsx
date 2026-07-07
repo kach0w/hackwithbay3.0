@@ -19,7 +19,7 @@ export default function ProjectView({ sessionId, member }) {
   function handleResult(result) {
     load()
     if (result.affected?.length > 0) {
-      const ids = result.affected.flatMap(a => [a.notify, ...a.affected])
+      const ids = result.affected.flatMap(a => [a.notifyId, ...(a.affectedIds || [])].filter(Boolean))
       setHighlightIds(ids)
       setTimeout(() => setHighlightIds([]), 4000)
     }

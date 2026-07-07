@@ -21,6 +21,8 @@ export default function EventInput({ sessionId, member, onResult }) {
       setLast(result)
       setText('')
       onResult?.(result)
+    } catch (err) {
+      setLast({ error: err.message })
     } finally {
       setLoading(false)
     }
@@ -60,11 +62,17 @@ export default function EventInput({ sessionId, member, onResult }) {
 
       {last && (
         <div style={{ marginTop: 8, fontSize: 10, fontFamily: bp.font, letterSpacing: 1, color: bp.muted }}>
-          INTENT: <span style={{ color: '#ffe066' }}>{last.intent?.toUpperCase()}</span>
-          {last.affected?.length > 0 && (
-            <span style={{ marginLeft: 20, color: '#ff9999' }}>
-              NOTIFY → {last.affected.map(a => a.notify?.toUpperCase()).join(', ')}
-            </span>
+          {last.error ? (
+            <span style={{ color: '#fca5a5' }}>ERROR: {last.error}</span>
+          ) : (
+            <>
+              INTENT: <span style={{ color: '#ffe066' }}>{last.intent?.toUpperCase()}</span>
+              {last.affected?.length > 0 && (
+                <span style={{ marginLeft: 20, color: '#ff9999' }}>
+                  NOTIFY → {last.affected.map(a => a.notify?.toUpperCase()).join(', ')}
+                </span>
+              )}
+            </>
           )}
         </div>
       )}

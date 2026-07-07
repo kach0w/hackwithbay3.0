@@ -28,7 +28,7 @@ router.post('/:sessionId/join', async (req, res) => {
     const result = await ingestProfile(sessionId, { userId, name, github, linkedin, website, interests })
     const overlaps = await computeOverlaps(sessionId).catch(() => [])
 
-    await broadcast({ type: 'graph_update', author: name, event: 'join' })
+    await broadcast({ type: 'graph_update', author: name, event: 'join', sessionId })
     res.json({ success: true, ...result, overlaps })
   } catch (err) {
     console.error(err)

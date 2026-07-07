@@ -41,5 +41,7 @@ export async function postEvent(sessionId, text, member) {
       personId: member.personId
     })
   })
-  return res.json()
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || 'Event failed')
+  return data
 }

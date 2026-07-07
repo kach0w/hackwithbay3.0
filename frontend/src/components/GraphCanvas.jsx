@@ -23,7 +23,7 @@ const NODE_SIZE = {
 
 function getSize(type) { return NODE_SIZE[type] || { w: 110, h: 30 } }
 
-export default function GraphCanvas({ graph, highlightIds = [], mode = 'brainstorm' }) {
+export default function GraphCanvas({ graph, highlightIds = [], mode = 'brainstorm', onNodeClick }) {
   const fgRef = useRef()
   const bgRef = useRef()
   const frozenRef = useRef(false)
@@ -219,6 +219,7 @@ export default function GraphCanvas({ graph, highlightIds = [], mode = 'brainsto
         linkLabel={l => l.type}
         onEngineStop={handleEngineStop}
         onEngineInit={handleEngineInit}
+        onNodeClick={onNodeClick ? node => onNodeClick(node) : undefined}
         d3AlphaDecay={0.04}
         d3VelocityDecay={0.4}
         cooldownTicks={120}
