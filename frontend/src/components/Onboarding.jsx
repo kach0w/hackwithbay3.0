@@ -28,7 +28,13 @@ const Field = ({ label, value, onChange, placeholder, optional, hint }) => (
 )
 
 export default function Onboarding({ sessionId, shareUrl, onJoined }) {
-  const [form, setForm] = useState({ name: '', github: '', linkedin: '', website: '', interests: '' })
+  const [form, setForm] = useState({
+    name:      'Karthik Sabhanayakam',
+    github:    'kach0w',
+    linkedin:  'linkedin.com/in/karsab',
+    website:   'kach0w.github.io',
+    interests: ''
+  })
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState('')
   const [copied, setCopied] = useState(false)

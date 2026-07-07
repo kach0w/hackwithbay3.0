@@ -6,44 +6,77 @@ import { extractFromWebsite } from './website.js'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
-async function synthesizeProfile(name, github, linkedin, website, interests, ghData, liData, wsData) {
+async function synthesizeProfile(name, interests, ghData, liData, wsData) {
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
-    max_tokens: 1024,
-    system: `You are building a deep, logical profile of a builder/developer.
-Do not just list tags. Reason about the person — their trajectory, what problems they gravitate toward, how they think, what they'd be uniquely good at building.
-Be specific and concrete. Avoid generic statements like "passionate about technology".`,
+    max_tokens: 1500,
+    system: `You are building a deep, honest profile of a person — not a resume summary, not a list of skills.
+You are trying to understand who they really are: technically, intellectually, and humanistically.
+
+Think about:
+- What do they actually care about vs what they just do for work?
+- What kind of thinker are they? (systems, product, creative, analytical, iterative...)
+- What motivates them beyond compensation?
+- How do they communicate and collaborate?
+- What are they moving toward, not just where they've been?
+- What is their relationship with technology — tool, craft, obsession, means to an end?
+- What would they talk about at dinner that isn't on their resume?
+
+Be specific. Avoid corporate language. Write as if you actually know this person.`,
     messages: [{
       role: 'user',
       content: `Build a complete profile of ${name} from all available data.
 
-GITHUB:
-- Languages/skills: ${ghData.skills?.join(', ') || 'none'}
-- Domains inferred from repos: ${ghData.domains?.join(', ') || 'none'}
-- GitHub summary: ${ghData.summary || 'none'}
+--- GITHUB (what they build and what they admire) ---
+Languages/skills: ${(ghData.skills || []).join(', ') || 'none'}
+Repos built: ${ghData.repoCount || 0}, Stars received: ${ghData.starCount || 0}
+Technical patterns: ${(ghData.technical_patterns || []).join(', ') || 'none'}
+Curiosity areas (from stars): ${(ghData.curiosity_areas || []).join(', ') || 'none'}
+Builder style: ${ghData.builder_style || 'none'}
+GitHub summary: ${ghData.summary || 'none'}
 
-LINKEDIN:
-- Roles: ${liData.roles?.join(', ') || 'none'}
-- Companies: ${liData.companies?.join(', ') || 'none'}
-- Industries: ${liData.industries?.join(', ') || 'none'}
-- LinkedIn summary: ${liData.summary || 'none'}
+--- LINKEDIN (their professional trajectory) ---
+Headline: ${liData.headline || 'none'}
+Roles: ${(liData.roles || []).join(', ') || 'none'}
+Companies: ${(liData.companies || []).join(', ') || 'none'}
+Industries: ${(liData.industries || []).join(', ') || 'none'}
+Career stage: ${liData.career_stage || 'none'}
+Trajectory: ${liData.trajectory || 'none'}
+LinkedIn summary: ${liData.summary || 'none'}
 
-PERSONAL WEBSITE:
-- Topics they write about: ${wsData.topics?.join(', ') || 'none'}
-- Writing style: ${wsData.writing_style || 'none'}
-- Website summary: ${wsData.summary || 'none'}
+--- PERSONAL WEBSITE (what they think and write about) ---
+Topics: ${(wsData.topics || []).join(', ') || 'none'}
+Intellectual interests: ${(wsData.intellectual_interests || []).join(', ') || 'none'}
+Values: ${(wsData.values || []).join(', ') || 'none'}
+Writing style: ${wsData.writing_style || 'none'}
+Communication style: ${wsData.communication_style || 'none'}
+Website summary: ${wsData.summary || 'none'}
 
-SELF-REPORTED INTERESTS: ${interests || 'none'}
+--- SELF-REPORTED ---
+${interests || 'none'}
 
 Return JSON only:
 {
-  "archetype": "one of: systems-builder | product-thinker | researcher | infrastructure-engineer | full-stack-builder | data-engineer | designer-engineer",
-  "synthesis": "2-3 sentence paragraph describing this person as a builder — their trajectory, what they gravitate toward, what makes them distinct. Be specific.",
-  "strongest_in": ["top 3 concrete areas where they have real depth"],
-  "curious_about": ["top 3 areas they're clearly exploring or moving toward"],
-  "working_style": "one sentence on how they approach problems",
-  "skills": ["concrete technical skills, max 8"],
-  "domains": ["problem domains, max 6"]
+  "archetype": "one of: systems-builder | product-thinker | researcher | infrastructure-engineer | full-stack-builder | data-engineer | designer-engineer | hacker | educator | founder-minded",
+
+  "synthesis": "3-4 sentences that paint a real picture of this person — their technical depth, what drives them humanistically, how they think, and what makes them distinct as a collaborator and builder. Write as if describing them to a teammate who hasn't met them yet.",
+
+  "technical_depth": "one sentence on where they have real depth vs where they're still exploring",
+
+  "human_dimension": "one sentence on what drives them beyond technology — what problem in the world they seem to care about fixing, or what kind of impact they're after",
+
+  "collaboration_style": "one sentence on how they likely work with others based on communication patterns and background",
+
+  "strongest_in": ["3 specific areas of genuine depth — be concrete"],
+
+  "curious_about": ["3 areas they're clearly moving toward or exploring — be specific"],
+
+  "blind_spots": ["1-2 honest gaps or areas they likely haven't worked in yet — useful for team composition"],
+
+  "conversation_topics": ["3 things this person would genuinely geek out about beyond their job title"],
+
+  "skills": ["concrete technical skills, max 10"],
+  "domains": ["problem domains they work in or toward, max 6"]
 }`
     }]
   })
@@ -55,15 +88,16 @@ Return JSON only:
 export async function ingestProfile(sessionId, { name, github, linkedin, website, interests }) {
   const personId = `person_${name.toLowerCase().replace(/\s+/g, '_')}`
 
-  // Parallel scraping
+  console.log(`[Profile] Ingesting ${name}...`)
+
   const [ghData, liData, wsData] = await Promise.all([
-    github   ? extractFromGitHub(github).catch(() => ({ skills: [], domains: [], summary: '' }))   : Promise.resolve({ skills: [], domains: [], summary: '' }),
-    linkedin ? extractFromLinkedIn(linkedin).catch(() => ({ skills: [], roles: [], companies: [], industries: [], summary: '' })) : Promise.resolve({ skills: [], roles: [], companies: [], industries: [], summary: '' }),
-    website  ? extractFromWebsite(website).catch(() => ({ topics: [], domains: [], summary: '' }))  : Promise.resolve({ topics: [], domains: [], summary: '' })
+    github   ? extractFromGitHub(github).catch(e   => { console.warn('[GitHub] failed:', e.message);   return {} }) : Promise.resolve({}),
+    linkedin ? extractFromLinkedIn(linkedin).catch(e => { console.warn('[LinkedIn] failed:', e.message); return {} }) : Promise.resolve({}),
+    website  ? extractFromWebsite(website).catch(e  => { console.warn('[Website] failed:', e.message);  return {} }) : Promise.resolve({})
   ])
 
-  // Claude synthesizes everything into a complete picture
-  const profile = await synthesizeProfile(name, github, linkedin, website, interests, ghData, liData, wsData)
+  console.log(`[Profile] Synthesizing ${name}...`)
+  const profile = await synthesizeProfile(name, interests, ghData, liData, wsData)
 
   const allSkills  = [...new Set([...(ghData.skills || []), ...(liData.skills || []), ...(profile.skills || [])])]
   const allDomains = [...new Set([...(ghData.domains || []), ...(wsData.domains || []), ...(profile.domains || [])])]
@@ -71,20 +105,25 @@ export async function ingestProfile(sessionId, { name, github, linkedin, website
   await addPerson(sessionId, {
     id: personId,
     name,
-    github:      github || '',
-    archetype:   profile.archetype || '',
-    synthesis:   profile.synthesis || '',
-    strongest_in: profile.strongest_in || [],
-    curious_about: profile.curious_about || [],
-    working_style: profile.working_style || '',
+    github: github || '',
+    archetype:           profile.archetype || '',
+    synthesis:           profile.synthesis || '',
+    technical_depth:     profile.technical_depth || '',
+    human_dimension:     profile.human_dimension || '',
+    collaboration_style: profile.collaboration_style || '',
+    strongest_in:        profile.strongest_in || [],
+    curious_about:       profile.curious_about || [],
+    blind_spots:         profile.blind_spots || [],
+    conversation_topics: profile.conversation_topics || [],
     skills:  allSkills,
     domains: allDomains
   })
 
   await Promise.all([
-    ...allSkills.slice(0, 8).map(s  => addSkillEdge(sessionId, personId, s)),
+    ...allSkills.slice(0, 10).map(s  => addSkillEdge(sessionId, personId, s)),
     ...allDomains.slice(0, 6).map(d => addDomainEdge(sessionId, personId, d))
   ])
 
+  console.log(`[Profile] ${name} done — ${allSkills.length} skills, ${allDomains.length} domains`)
   return { personId, skills: allSkills, domains: allDomains, profile }
 }

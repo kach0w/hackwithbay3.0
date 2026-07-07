@@ -5,6 +5,30 @@ import { useRealtime } from '../hooks/useRealtime'
 
 const bp = { font: "'Courier New', monospace", muted: 'rgba(255,255,255,0.5)', border: 'rgba(255,255,255,0.3)' }
 
+function Section({ label, color, children }) {
+  return (
+    <div style={{ marginBottom: 12, borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 10 }}>
+      <div style={{ fontSize: 9, color: bp.muted, letterSpacing: 2, marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 10, color, lineHeight: 1.65 }}>{children}</div>
+    </div>
+  )
+}
+
+function Tags({ label, items, color }) {
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ fontSize: 9, color: bp.muted, letterSpacing: 2, marginBottom: 5 }}>{label}</div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+        {items.map(item => (
+          <span key={item} style={{ fontSize: 9, color, border: `1px solid ${color}`, padding: '2px 6px', letterSpacing: 0.5, opacity: 0.85 }}>
+            {item}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function BrainstormView({ sessionId, author }) {
   const [graph, setGraph] = useState({ nodes: [], edges: [] })
   const [selected, setSelected] = useState(null)
@@ -77,15 +101,22 @@ export default function BrainstormView({ sessionId, author }) {
         {/* Selected node detail */}
         {selected && (
           <div style={{ padding: '14px 16px', flex: 1, overflowY: 'auto' }}>
-            <div style={{ fontSize: 10, color: bp.muted, letterSpacing: 3, marginBottom: 10 }}>DETAIL</div>
-            <div style={{ fontSize: 12, color: '#fff', marginBottom: 6 }}>{selected.label}</div>
-            {selected.synthesis && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6, marginBottom: 8 }}>{selected.synthesis}</div>}
-            {selected.build_direction && <div style={{ fontSize: 10, color: '#fde68a', lineHeight: 1.6, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8 }}>BUILD: {selected.build_direction}</div>}
-            {selected.strongest_in?.length > 0 && (
-              <div style={{ marginTop: 8, fontSize: 10, color: bp.muted }}>
-                STRONGEST: {selected.strongest_in.join(' · ')}
-              </div>
-            )}
+            <div style={{ fontSize: 10, color: bp.muted, letterSpacing: 3, marginBottom: 10 }}>PROFILE</div>
+            <div style={{ fontSize: 13, color: '#fff', fontWeight: 700, marginBottom: 4 }}>{selected.label}</div>
+            {selected.archetype && <div style={{ fontSize: 9, color: '#7dd3fc', letterSpacing: 2, marginBottom: 10 }}>{selected.archetype?.toUpperCase()}</div>}
+
+            {selected.synthesis && <Section label="WHO THEY ARE" color="rgba(255,255,255,0.75)">{selected.synthesis}</Section>}
+            {selected.human_dimension && <Section label="WHAT DRIVES THEM" color="#86efac">{selected.human_dimension}</Section>}
+            {selected.technical_depth && <Section label="TECHNICAL DEPTH" color="#7dd3fc">{selected.technical_depth}</Section>}
+            {selected.collaboration_style && <Section label="COLLABORATION" color="rgba(255,255,255,0.5)">{selected.collaboration_style}</Section>}
+
+            {selected.strongest_in?.length > 0 && <Tags label="STRONGEST IN" items={selected.strongest_in} color="#7dd3fc" />}
+            {selected.curious_about?.length > 0 && <Tags label="CURIOUS ABOUT" items={selected.curious_about} color="#86efac" />}
+            {selected.conversation_topics?.length > 0 && <Tags label="GEEKS OUT ON" items={selected.conversation_topics} color="#fde68a" />}
+            {selected.blind_spots?.length > 0 && <Tags label="BLIND SPOTS" items={selected.blind_spots} color="rgba(255,100,100,0.7)" />}
+
+            {selected.build_direction && <Section label="BUILD TOGETHER" color="#fde68a">{selected.build_direction}</Section>}
+            {selected.intersection && <Section label="OVERLAP" color="#fde68a">{selected.intersection}</Section>}
           </div>
         )}
       </div>

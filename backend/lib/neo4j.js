@@ -100,21 +100,33 @@ function shapeNode(n) {
   }
 }
 
-export async function addPerson(sessionId, { id, name, github, synthesis, archetype, strongest_in, curious_about, working_style, skills, domains }) {
+export async function addPerson(sessionId, { id, name, github, synthesis, archetype, technical_depth, human_dimension, collaboration_style, strongest_in, curious_about, blind_spots, conversation_topics, skills, domains }) {
   await run(`
     MATCH (s:Session {id: $sessionId})
     MERGE (p:Person {id: $id})
-    SET p.name = $name, p.github = $github,
+    SET p.name = $name, p.label = $name, p.github = $github,
         p.synthesis = $synthesis, p.archetype = $archetype,
-        p.strongest_in = $strongest_in, p.curious_about = $curious_about,
-        p.working_style = $working_style,
-        p.skills = $skills, p.domains = $domains,
-        p.label = $name
+        p.technical_depth = $technical_depth,
+        p.human_dimension = $human_dimension,
+        p.collaboration_style = $collaboration_style,
+        p.strongest_in = $strongest_in,
+        p.curious_about = $curious_about,
+        p.blind_spots = $blind_spots,
+        p.conversation_topics = $conversation_topics,
+        p.skills = $skills, p.domains = $domains
     MERGE (p)-[:IN_SESSION]->(s)
-  `, { sessionId, id, name, github: github || '', synthesis: synthesis || '',
-       archetype: archetype || '', strongest_in: strongest_in || [],
-       curious_about: curious_about || [], working_style: working_style || '',
-       skills, domains })
+  `, {
+    sessionId, id, name, github: github || '',
+    synthesis: synthesis || '', archetype: archetype || '',
+    technical_depth: technical_depth || '',
+    human_dimension: human_dimension || '',
+    collaboration_style: collaboration_style || '',
+    strongest_in: strongest_in || [],
+    curious_about: curious_about || [],
+    blind_spots: blind_spots || [],
+    conversation_topics: conversation_topics || [],
+    skills, domains
+  })
 }
 
 export async function fetchBrainstormGraph(sessionId) {
