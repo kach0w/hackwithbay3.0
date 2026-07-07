@@ -26,8 +26,8 @@ Only return JSON. No explanation.`
 
 export async function extract(text, author) {
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 256,
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 200,
     system: SYSTEM,
     messages: [{ role: 'user', content: `Input: "${text}" by ${author}` }]
   })

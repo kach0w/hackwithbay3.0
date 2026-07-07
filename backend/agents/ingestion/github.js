@@ -53,8 +53,8 @@ export async function extractFromGitHub(username) {
   const totalStarsReceived = repos.reduce((s, r) => s + (r.stargazers_count || 0), 0)
 
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 768,
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 512,
     messages: [{
       role: 'user',
       content: `Analyze this GitHub profile to understand who this developer is — technically AND as a person.

@@ -1,20 +1,68 @@
 import React, { useState } from 'react'
 import { createSession } from '../lib/api'
+import { butterbase, butterbaseConfigured } from '../lib/butterbase'
 
 const bp = {
   bg: '#1464b4', border: 'rgba(255,255,255,0.3)',
-  font: "'Courier New', monospace", text: '#fff', muted: 'rgba(255,255,255,0.5)'
+  font: "'Courier New', monospace", text: '#fff', muted: 'rgba(255,255,255,0.5)',
+  input: 'rgba(255,255,255,0.08)'
+}
+
+const S = {
+  input: {
+    width: '100%', background: bp.input, color: bp.text,
+    border: `1px solid ${bp.border}`, fontFamily: bp.font,
+    fontSize: 12, letterSpacing: 1, padding: '10px 12px', outline: 'none'
+  },
+  btn: (primary) => ({
+    width: '100%', background: primary ? 'rgba(255,255,255,0.12)' : 'transparent',
+    color: bp.text, border: `1px solid ${bp.border}`,
+    fontFamily: bp.font, fontSize: 11, letterSpacing: 3,
+    padding: '12px', cursor: 'pointer'
+  }),
+  label: { fontSize: 10, color: bp.muted, letterSpacing: 3, marginBottom: 10, display: 'block' },
+  panel: { border: `1px solid ${bp.border}`, padding: 24, marginBottom: 0 }
+}
+
+function BgGrid() {
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, pointerEvents: 'none',
+      backgroundImage: 'repeating-linear-gradient(0deg,rgba(255,255,255,0.05) 0,rgba(255,255,255,0.05) 1px,transparent 1px,transparent 28px),repeating-linear-gradient(90deg,rgba(255,255,255,0.05) 0,rgba(255,255,255,0.05) 1px,transparent 1px,transparent 28px)'
+    }} />
+  )
 }
 
 export default function Landing({ onSession }) {
-  const [joinId, setJoinId] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [joinId,   setJoinId]   = useState('')
+  const [email,    setEmail]    = useState('')
+  const [password, setPassword] = useState('')
+  const [authMode, setAuthMode] = useState('login') // login | signup
+  const [authErr,  setAuthErr]  = useState('')
+  const [authOk,   setAuthOk]   = useState(false)
+  const [loading,  setLoading]  = useState(false)
+
+  async function handleAuth(e) {
+    e.preventDefault()
+    if (!butterbaseConfigured || !butterbase) return
+    setAuthErr('')
+    setLoading(true)
+    try {
+      const fn = authMode === 'login' ? butterbase.auth.signIn : butterbase.auth.signUp
+      const { error } = await fn({ email, password })
+      if (error) { setAuthErr(error.message); setLoading(false); return }
+      setAuthOk(true)
+    } catch (err) {
+      setAuthErr(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   async function handleCreate() {
     setLoading(true)
     const { sessionId } = await createSession()
-    const url = `${window.location.origin}?s=${sessionId}`
-    onSession(sessionId, url)
+    onSession(sessionId, `${window.location.origin}?s=${sessionId}`)
     setLoading(false)
   }
 
@@ -24,68 +72,74 @@ export default function Landing({ onSession }) {
   }
 
   return (
-    <div style={{
-      height: '100vh', background: bp.bg, display: 'flex',
-      flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      fontFamily: bp.font, color: bp.text,
-      backgroundImage: 'repeating-linear-gradient(0deg, rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) 1px, transparent 1px, transparent 24px), repeating-linear-gradient(90deg, rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) 1px, transparent 1px, transparent 24px)'
-    }}>
-      <div style={{ textAlign: 'center', marginBottom: 48 }}>
-        <div style={{ fontSize: 32, letterSpacing: 8, fontWeight: 700 }}>HIVEMIND</div>
-        <div style={{ fontSize: 11, color: bp.muted, letterSpacing: 4, marginTop: 8 }}>
-          SHARED PROJECT MEMORY SYSTEM
-        </div>
+    <div style={{ height: '100vh', background: bp.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: bp.font, color: bp.text }}>
+      <BgGrid />
+
+      <div style={{ textAlign: 'center', marginBottom: 52, position: 'relative' }}>
+        <div style={{ fontSize: 36, letterSpacing: 10, fontWeight: 700 }}>HIVEMIND</div>
+        <div style={{ fontSize: 10, color: bp.muted, letterSpacing: 5, marginTop: 10 }}>SHARED PROJECT MEMORY SYSTEM</div>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 32, width: 380 }}>
-        {/* Create */}
-        <div style={{ border: `1px solid ${bp.border}`, padding: 24 }}>
-          <div style={{ fontSize: 10, color: bp.muted, letterSpacing: 3, marginBottom: 16 }}>
-            NEW SESSION
+      <div style={{ display: 'flex', gap: 24, position: 'relative', alignItems: 'flex-start' }}>
+
+        {/* Auth panel */}
+        {butterbaseConfigured && (
+          <div style={{ ...S.panel, width: 300 }}>
+            {authOk ? (
+              <div style={{ fontSize: 11, color: '#86efac', letterSpacing: 2, textAlign: 'center', padding: '8px 0' }}>
+                SIGNED IN ✓
+              </div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', marginBottom: 16, gap: 0 }}>
+                  {['login','signup'].map(m => (
+                    <button key={m} onClick={() => setAuthMode(m)} style={{
+                      flex: 1, background: 'transparent', color: authMode === m ? bp.text : bp.muted,
+                      border: 'none', borderBottom: `1px solid ${authMode === m ? bp.text : 'rgba(255,255,255,0.15)'}`,
+                      fontFamily: bp.font, fontSize: 10, letterSpacing: 3, padding: '8px', cursor: 'pointer'
+                    }}>
+                      {m === 'login' ? 'SIGN IN' : 'SIGN UP'}
+                    </button>
+                  ))}
+                </div>
+                <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <input value={email} onChange={e => setEmail(e.target.value)} placeholder="EMAIL" type="email" style={S.input} />
+                  <input value={password} onChange={e => setPassword(e.target.value)} placeholder="PASSWORD" type="password" style={S.input} />
+                  {authErr && <div style={{ fontSize: 10, color: '#fca5a5', letterSpacing: 1 }}>{authErr}</div>}
+                  <button type="submit" disabled={loading} style={S.btn(true)}>
+                    {loading ? '...' : authMode === 'login' ? 'SIGN IN' : 'CREATE ACCOUNT'}
+                  </button>
+                </form>
+              </>
+            )}
           </div>
-          <button
-            onClick={handleCreate}
-            disabled={loading}
-            style={{
-              width: '100%', background: 'rgba(255,255,255,0.1)',
-              color: bp.text, border: `1px solid ${bp.border}`,
-              fontFamily: bp.font, fontSize: 12, letterSpacing: 3,
-              padding: '12px', cursor: 'pointer'
-            }}
-          >
-            {loading ? 'CREATING...' : 'CREATE HIVEMIND'}
-          </button>
+        )}
+
+        {/* Session panels */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, width: 300 }}>
+          <div style={S.panel}>
+            <span style={S.label}>NEW SESSION</span>
+            <button onClick={handleCreate} disabled={loading} style={S.btn(true)}>
+              {loading ? 'CREATING...' : 'CREATE HIVEMIND'}
+            </button>
+          </div>
+
+          <div style={S.panel}>
+            <span style={S.label}>JOIN EXISTING</span>
+            <form onSubmit={handleJoin} style={{ display: 'flex', gap: 8 }}>
+              <input
+                value={joinId}
+                onChange={e => setJoinId(e.target.value)}
+                placeholder="SESSION ID"
+                style={{ ...S.input, flex: 1 }}
+              />
+              <button type="submit" style={{ ...S.btn(false), width: 'auto', padding: '10px 16px', whiteSpace: 'nowrap' }}>
+                JOIN
+              </button>
+            </form>
+          </div>
         </div>
 
-        {/* Join */}
-        <div style={{ border: `1px solid ${bp.border}`, padding: 24 }}>
-          <div style={{ fontSize: 10, color: bp.muted, letterSpacing: 3, marginBottom: 16 }}>
-            JOIN EXISTING SESSION
-          </div>
-          <form onSubmit={handleJoin} style={{ display: 'flex', gap: 8 }}>
-            <input
-              value={joinId}
-              onChange={e => setJoinId(e.target.value)}
-              placeholder="SESSION ID"
-              style={{
-                flex: 1, background: 'rgba(255,255,255,0.08)',
-                color: bp.text, border: `1px solid ${bp.border}`,
-                fontFamily: bp.font, fontSize: 12, letterSpacing: 2,
-                padding: '10px 12px', outline: 'none'
-              }}
-            />
-            <button
-              type="submit"
-              style={{
-                background: 'transparent', color: bp.text,
-                border: `1px solid ${bp.border}`, fontFamily: bp.font,
-                fontSize: 11, letterSpacing: 2, padding: '10px 16px', cursor: 'pointer'
-              }}
-            >
-              JOIN
-            </button>
-          </form>
-        </div>
       </div>
     </div>
   )
